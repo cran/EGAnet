@@ -10,33 +10,36 @@
 #'
 #' @return Returns a list containing:
 #'
-#' \item{Entropy.Fit}{The Entropy Fit Index using Von Neumman's entropy}
+#' \item{VN.Entropy.Fit}{The Entropy Fit Index using Von Neumman's entropy}
 #'
 #' \item{Total.Correlation}{The total correlation of the dataset}
 #'
 #' \item{Average.Entropy}{The average entropy of the dataset}
 #'
 #' @examples
-#' \donttest{
-#' #estimate EGA model
-#' ega.wmt <- EGA(data = wmt2[,7:24], model = "glasso")
+#' # Load data
+#' wmt <- wmt2[,7:24]
 #'
-#' #compute entropy indices
-#' vn.entropy(data = wmt2[,7:24], structure = ega.wmt$wc)
-#'}
-#' @seealso \code{\link{EGA}} to estimate the number of dimensions of an instrument using EGA and \code{\link{CFA}} to
-#' verify the fit of the structure suggested by EGA using confirmatory factor analysis.
+#' \dontrun{
+#' # Estimate EGA model
+#' ega.wmt <- EGA(data = wmt, model = "glasso")
 #'
-#' @author Hudson F. Golino <hfg9s at virginia.edu> and Alexander P. Christensen <alexpaulchristensen@gmail.com>
+#' }
+#'
+#' # Compute entropy indices
+#' vn.entropy(data = wmt, structure = ega.wmt$wc)
+#'
+#' @seealso \code{\link[EGAnet]{EGA}} to estimate the number of dimensions of an instrument using EGA and
+#' \code{\link[EGAnet]{CFA}} to verify the fit of the structure suggested by EGA using confirmatory factor analysis.
+#'
+#' @author Hudson F. Golino <hfg9s at virginia.edu>, Alexander P. Christensen <alexpaulchristensen@gmail.com> and Robert Moulder <rgm4fd@virginia.edu>
 #'
 #' @export
 #Entropy Fit Index
 # VN Entropy Function (for correlation matrices)
 vn.entropy <- function(data, structure){
-
   uniq <- unique(structure)
   num.comm <- structure
-
   if(!is.matrix(data)){
     cor1 <- qgraph::cor_auto(data)/ncol(data)
     eigen1 <- eigen(cor1)$values
@@ -98,18 +101,15 @@ vn.entropy <- function(data, structure){
     }
 
     h.vn.joint <- -sum(eigen.kronecker*log(eigen.kronecker))
-
-    h.vn.joint <- -sum(eigen.kronecker*log(eigen.kronecker))
   }
 
   h.vn.fact2 <- unlist(h.vn.fact)
 
   # Difference between Max the sum of the factor entropies:
   Hdiff <- h.vn-mean(h.vn.fact2)
-
   results <- data.frame(matrix(NA, nrow = 1, ncol = 3))
-  colnames(results) <- c("Entropy.Fit", "Total.Correlation","Average.Entropy")
-  results$Entropy.Fit <- ((mean(h.vn.fact2)-h.vn.joint))-((Hdiff-(mean(h.vn.fact2))*sqrt(n)))
+  colnames(results) <- c("VN.Entropy.Fit", "Total.Correlation","Average.Entropy")
+  results$VN.Entropy.Fit <- ((mean(h.vn.fact2)-h.vn.joint))-((Hdiff-(mean(h.vn.fact2))*sqrt(n)))
   results$Total.Correlation <- sum(h.vn.fact2)-h.vn.joint
   results$Average.Entropy <- mean(h.vn.fact2)-h.vn.joint
   return(results)
