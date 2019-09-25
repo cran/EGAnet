@@ -25,7 +25,7 @@ Defaults to \code{TRUE}}
 \value{
 Returns a list containing:
 
-\item{item.replication}{The proporton of times each item replicated
+\item{item.replication}{The proportion of times each item replicated
 within the defined dimension}
 
 \item{item.dim.rep}{The proportion of times each item replicated
@@ -33,18 +33,21 @@ within each possible dimension. Dimensions greater than the maximum
 number used in the \code{orig.wc} argument are labeled based on the
 largest remaining components after the dimensions used to \code{orig.wc}}
 
-\item{item.loadings}{Matrix of the average standardied network loading
+\item{item.loadings}{Matrix of the average standardized network loading
 (computed using \code{\link[EGAnet]{net.loads}}) for each item in each dimension}
 
 \item{wc}{A matrix containing the community membership values for
 each bootstrapped sample. The values correspond to the values input
 for the \code{orig.wc} argument}
+
+\item{plot.itemStability}{A plot of the number of times each item
+replicates in its original community membership (\code{orig.wc})}
 }
 \description{
 Based on the \code{\link[EGAnet]{bootEGA}} results, this function
 computes and plots the number of times an item (variable) is estimated
-in the same factor/dimension as originaly estimated by \code{\link[EGAnet]{EGA}} (\code{item.replication}).
-The output also contains each item's replication frequency (i.e., proprotion of
+in the same factor/dimension as originally estimated by \code{\link[EGAnet]{EGA}} (\code{item.replication}).
+The output also contains each item's replication frequency (i.e., proportion of
 bootstraps that an item appeared in each dimension; \code{item.dim.rep}) as well as the average
 network loading for each item in each dimension (\code{item.loadings}).
 }
