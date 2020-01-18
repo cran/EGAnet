@@ -1,8 +1,27 @@
+Changes in version 0.9.0
+
+o updated list of dependencies
+
+o added ORCiDs in Description file
+
+o corrected ordering of `net.loads` output
+
+o corrected standard error in `bootEGA`
+
+o citation update
+
+o added function `dimStability` to compute dimensional stability
+
+o added a series of functions for `node.redundant`, which facilitat
+es detecting and combining redundant nodes in networks
+
+o updated the EGA.fit function, so now a correlation matrix can be used as well.
+
 Changes in version 0.8.0
 
 o 'bootEGA' now computes time until bootstrap is finished
 
-o new functions 'cmi' and 'residualEGA' added: 'cmi' computes conditional mutual information and residual EGA computes an EGA network controlling for wording effects
+o new functions 'cmi', 'pmi' and 'residualEGA' added: 'cmi' computes conditional mutual information, 'pmi' computes partial mutual information and residual EGA computes an EGA network controlling for wording effects
 
 o new dataset 'optimism' added
 
