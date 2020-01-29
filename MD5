@@ -1,4 +1,4 @@
-038776ac5188be88674dd9e191520d76 *DESCRIPTION
+cfde1a8050c530f2550712554822a445 *DESCRIPTION
 45745d3946bc8a8b875ba46bad742c45 *NAMESPACE
 6d8a9ef66bfffd9c52b587fe795f12ba *NEWS
 d43136c6f960cfb71fcb77bdcb182b3f *R/CFA.R
@@ -20,7 +20,7 @@ c76223906da4283552241b456c4e5ed5 *R/methods.R
 fae6f6681c034eec73cc16dff23b63d8 *R/net.loads.R
 25909fbe6c09f064ca35cf5e6a3697be *R/net.scores.R
 7d19f30dd3763a67645e8b03c5ad5bb1 *R/node.redundant.R
-917d1775829b181124249ec6c12660a5 *R/node.redundant.combine.R
+e11d4b24f73863cdedf2c5c3e5e1a22f *R/node.redundant.combine.R
 7a86bd897fb42b2aa052e99d39993a83 *R/node.redundant.names.R
 47f4e9869599b676141c5234a91bb9e8 *R/optimism.R
 2e997b2ad0a556ab1815e06daa6e4645 *R/plot.CFA.R
@@ -49,10 +49,10 @@ ee0e8186f76d28f6cdf7b8a3f09738b9 *data/intelligenceBattery.rda
 66ec1110bbff5f0fdf3f929cd3ddc00c *inst/CITATION
 efb6ada1aec86352c6cd747f860de651 *inst/doc/Network_Scores.R
 ff09fb51eee69857a5f93f1103bd5770 *inst/doc/Network_Scores.Rmd
-a3860093f5a0f2efa14e0fc1bd4f359a *inst/doc/Network_Scores.html
+d0b042c76ca8743621b12a68d6154ace *inst/doc/Network_Scores.html
 509f62cbb525342d76879c610cc466ba *inst/doc/Redundant_Nodes.R
 808d27b991ce8a3c03b96f75166178bb *inst/doc/Redundant_Nodes.Rmd
-bc1da8cd2126a7b442c5c484b35cf5df *inst/doc/Redundant_Nodes.html
+c62d3f5635e151a03e00327abb07c98e *inst/doc/Redundant_Nodes.html
 4732a8b5bf418e86bb27d34520bec56d *man/CFA.Rd
 da7b960980cf23f6cb8c9a0efaa4ac8d *man/EBICglasso.qgraph.Rd
 c4f139581e57fe1564786a47c3dafd04 *man/EGA.Rd
