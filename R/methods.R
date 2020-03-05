@@ -1,5 +1,94 @@
 # Methods:
 
+#Summary function for dynEGA
+summary.dynEGA <- function(object, ...) {
+  cat("dynEGA Results (Level: Population):\n")
+  cat("\nNumber of Dimensions:\n")
+  print(object$dynEGA$n.dim)
+  cat("\nItems per Dimension:\n")
+  print(object$dynEGA$dim.variables)
+}
+
+#Summary function for dynEGA (Level: Group)
+summary.dynEGA.Groups <- function(object, ...) {
+  for(i in 1:length(object$dynEGA)){
+    cat("dynEGA Results (Level: Group):\n")
+    cat("Group:", names(object$dynEGA[i]))
+    cat("\nNumber of Dimensions:\n")
+    print(object$dynEGA[[i]]$n.dim)
+    cat("\nItems per Dimension:\n")
+    print(object$dynEGA[[i]]$dim.variables)
+  }
+}
+
+#Summary function for dynEGA (Level: Individual - Intraindividual Structure)
+summary.dynEGA.Individuals <- function(object, ...) {
+  cat("Number of Cases (individuals): \n")
+  number <- length(object$dynEGA)
+  print(number)
+  cat("Summary statistics (number of factors/communities): \n")
+  dim <- sapply(object$dynEGA, "[[", 3)
+  cat("Mean:", mean(dim), "\n")
+  cat("Median:", median(dim), "\n")
+  cat("Min:", min(dim), "\n")
+  cat("Max:", max(dim), "\n")
+}
+
+#Print dynEGA.Groups function
+print.dynEGA.Groups <- function(x, ...) {
+  for(i in 1:length(x$dynEGA)){
+    cat("dynEGA Results (Level: Group):\n")
+    cat("Group:", names(x$dynEGA[i]))
+    cat("\nNumber of Dimensions:\n")
+    print(x$dynEGA[[i]]$n.dim)
+    cat("\nItems per Dimension:\n")
+    print(x$dynEGA[[i]]$dim.variables)
+  }
+}
+
+#Print dynEGA.Individuals function
+
+print.dynEGA.Individuals <- function(x, ...) {
+  cat("Number of Cases (individuals): \n")
+  number <- length(x$dynEGA)
+  print(number)
+  cat("Summary statistics (number of factors/communities): \n")
+  dim <- sapply(x$dynEGA, "[[", 3)
+  cat("Mean:", mean(dim), "\n")
+  cat("Median:", median(dim), "\n")
+  cat("Min:", min(dim), "\n")
+  cat("Max:", max(dim), "\n")
+}
+
+#Print dynEGA function
+print.dynEGA<- function(x, ...) {
+  cat("dynEGA Results (Level: Population):\n")
+  cat("\nNumber of Dimensions:\n")
+  print(x$dynEGA$n.dim)
+  cat("\nItems per Dimension:\n")
+  print(x$dynEGA$dim.variables)
+}
+
+#Plot dynEGA function (Level: Group)
+plot.dynEGA.Groups <- function(x, ncol, nrow, title = "", vsize = 6,  ...) {
+  par(mfrow=c(nrow,ncol))
+  for(i in 1:length(x$dynEGA)){
+    qgraph::qgraph(x$dynEGA[[i]]$network, layout = "spring", vsize = vsize, groups = as.factor(x$dynEGA[[i]]$wc), ...)
+    title(names(x$dynEGA)[[i]], ...)}
+}
+
+#Plot dynEGA function (Level: Population)
+plot.dynEGA <- function(x, title = "", vsize = 6,  ...) {
+  plot.dynEGA <- qgraph::qgraph(x$dynEGA$network, layout = "spring", vsize = vsize, groups = as.factor(x$dynEGA$wc), ...)
+
+}
+
+#Plot dynEGA function (Level: Individual)
+plot.dynEGA.Individuals <- function(x, title = "", vsize = 6,  id, ...) {
+  plot.dynEGA.Individuals <- qgraph::qgraph(x$dynEGA[[id]]$network, layout = "spring", vsize = vsize, groups = as.factor(x$dynEGA[[id]]$wc), ...)
+
+}
+
 # Plot EGA:
 
 plot.EGA <- function(ega.obj, title = "", vsize = 6,  ...){

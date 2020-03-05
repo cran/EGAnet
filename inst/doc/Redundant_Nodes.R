@@ -24,7 +24,7 @@ items <- spi[,idx]
 
 ## ----wto example, eval = TRUE, echo = TRUE, comment = NA, warning = FALSE, message = FALSE, cache = FALSE----
 # Identify redundant nodes
-redund <- node.redundant(items, type = "wTO", method = "adapt")
+redund <- node.redundant(items, method = "wTO", type = "adapt")
 
 # Change names in redundancy output to each item's description
 key.ind <- match(colnames(items), as.character(spi.dictionary$item_id))
@@ -41,7 +41,7 @@ knitr::kable(named.nr$redundant[1], booktabs = TRUE,
 
 ## ----combine NR example, eval = FALSE, echo = TRUE, comment = NA, warning = FALSE, message = FALSE, cache = FALSE----
 #  # Combining redundant responses
-#  combined.nr <- node.redundant.combine(named.nr, type = "optimal")
+#  combined.nr <- node.redundant.combine(named.nr, type = "latent")
 
 ## ----Fig1, fig.cap = "An example of the menu that appears for each redundant item",  fig.align = 'center', fig.pos = "H", warning=FALSE, message=FALSE, echo=FALSE----
 knitr::include_graphics(path = "./Figure_SI1_Code.png", dpi = 900)

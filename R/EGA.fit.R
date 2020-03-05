@@ -1,9 +1,10 @@
-#' \code{\link[EGAnet]{EGA}} Optimal Model Fit using \code{\link[EGAnet]{entropyFit}}
+#' \code{\link[EGAnet]{EGA}} Optimal Model Fit using the Total Entropy Fit Index  (\code{\link[EGAnet]{tefi}})
 #'
 #' @description Estimates the best fitting model using \code{\link[EGAnet]{EGA}}.
 #' The number of steps in the \code{\link[igraph]{cluster_walktrap}} detection
 #' algorithm is varied and unique community solutions are compared using
-#' \code{\link[EGAnet]{tefi}}.
+#' \code{\link[EGAnet]{tefi}}. Also computes \code{\link[igraph]{cluster_louvain}}
+#' community detection algorithm.
 #'
 #' @param data A dataset (or a correlation matrix).
 #'
@@ -78,26 +79,30 @@
 #' @author Hudson F. Golino <hfg9s at virginia.edu> and Alexander P. Christensen <alexpaulchristensen@gmail.com>
 #'
 #' @export
+# EGA fit
+# Updated 02.05.2020
 EGA.fit <- function (data, model = c("glasso","TMFG"),
                      steps = c(3,4,5,6,7,8), n = NULL)
 {
-    if(missing(model))
-    {model <- "glasso"
-    }else{model <- match.arg(model)}
+  if(missing(model))
+  {model <- "glasso"
+  }else{model <- match.arg(model)}
 
-    if(missing(steps))
-    {steps <- c(3,4,5,6,7,8)
-    }else{steps <- steps}
+  if(missing(steps))
+  {steps <- c(3,4,5,6,7,8)
+  }else{steps <- steps}
 
-    num <- length(steps)
+  best.fit <- list()
 
-    mods <- list()
-    dims <- matrix(NA, nrow = ncol(data), ncol = num)
+      num <- length(steps)
 
-    #Generate walktrap models
-    for(i in 1:num)
-    {
-        message(paste("Estimating EGA model",i,"of",num,sep=" "))
+      mods <- list()
+      dims <- matrix(NA, nrow = ncol(data), ncol = num)
+
+      #Generate walktrap models
+      for(i in 1:num)
+      {
+        message(paste("Estimating EGA -- Walktrap model",i,"of",num,sep=" "))
         mods[[as.character(steps[i])]] <- EGA(data = data,
                                               model = model,
                                               steps = steps[i],
@@ -105,34 +110,32 @@ EGA.fit <- function (data, model = c("glasso","TMFG"),
                                               n = n)
 
         dims[,i] <- mods[[as.character(steps[i])]]$wc
-    }
+      }
 
-    colnames(dims) <- as.character(steps)
+      colnames(dims) <- as.character(steps)
 
-    #check for unique number of dimensions
-    uniq.dim <- vector("numeric",length=(ncol(dims)))
+      #check for unique number of dimensions
+      uniq.dim <- vector("numeric",length=(ncol(dims)))
 
-    for(i in 2:(ncol(dims)))
-    {
+      for(i in 2:(ncol(dims)))
+      {
         uniq.dim[i] <- igraph::compare(dims[,i-1],dims[,i],method = "nmi")
         names(uniq.dim) <- paste(steps,sep="")
-    }
+      }
 
-    uniq <- unique(as.matrix(uniq.dim))
+      uniq <- unique(as.matrix(uniq.dim))
 
-    step <- as.numeric(row.names(uniq)[which(uniq!=1)])
+      step <- as.numeric(row.names(uniq)[which(uniq!=1)])
 
-    len <- length(step)
+      len <- length(step)
 
-    best.fit <- list()
-
-    #if all models are the same
-    if(len==1)
-    {
+      #if all models are the same
+      if(len==1)
+      {
         best.fit$EGA <- mods[[1]]
         best.fit$steps <- 4
         message("All EGA models are identical.")
-    }else{
+      }else{
 
         ent.vec <- vector("numeric",length=len)
 
@@ -145,8 +148,7 @@ EGA.fit <- function (data, model = c("glasso","TMFG"),
         best.fit$steps <- step[which(ent.vec==min(ent.vec))]
         best.fit$EntropyFit <- ent.vec
         best.fit$Lowest.EntropyFit <- ent.vec[which(ent.vec==min(ent.vec))]
-    }
-
-    return(best.fit)
-
+      }
+  return(best.fit)
 }
+#----

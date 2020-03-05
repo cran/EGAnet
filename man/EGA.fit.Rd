@@ -2,7 +2,7 @@
 % Please edit documentation in R/EGA.fit.R
 \name{EGA.fit}
 \alias{EGA.fit}
-\title{\code{\link[EGAnet]{EGA}} Optimal Model Fit using \code{\link[EGAnet]{entropyFit}}}
+\title{\code{\link[EGAnet]{EGA}} Optimal Model Fit using the Total Entropy Fit Index  (\code{\link[EGAnet]{tefi}})}
 \usage{
 EGA.fit(
   data,
@@ -57,7 +57,8 @@ the \code{\link[igraph]{cluster_walktrap}} algorithm}
 Estimates the best fitting model using \code{\link[EGAnet]{EGA}}.
 The number of steps in the \code{\link[igraph]{cluster_walktrap}} detection
 algorithm is varied and unique community solutions are compared using
-\code{\link[EGAnet]{tefi}}.
+\code{\link[EGAnet]{tefi}}. Also computes \code{\link[igraph]{cluster_louvain}}
+community detection algorithm.
 }
 \examples{
 

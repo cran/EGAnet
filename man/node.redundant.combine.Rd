@@ -6,7 +6,7 @@
 \usage{
 node.redundant.combine(
   node.redundant.obj,
-  type = c("sum", "optimal"),
+  type = c("sum", "latent"),
   estimator = "WLSMV",
   auto = FALSE,
   ...
@@ -22,13 +22,11 @@ Method to use to combine redundant variables.
 \item{\code{"sum"}}
 {Computes sum scores (i.e., means) of the variables}
 
-\item{\code{"optimal"}}
-{Computes latent variables using \code{[lavaan]{cfa}}
-when there are more than 2 variables that are redundant. Computes
-sum scores (i.e., means) when there are 2 redundant variables}
+\item{\code{"latent"}}
+{Computes latent variable scores using \code{[lavaan]{cfa}}}
 }
 
-Defaults to \code{"optimal"}}
+Defaults to \code{"latent"}}
 
 \item{estimator}{Character.
 Estimator to use for latent variables.
@@ -68,10 +66,10 @@ items <- psychTools::spi[,-c(1:10)]
 
 \donttest{
 # weighted topological overlap
-redund <- node.redundant(items, type = "wTO", method = "adapt")
+redund <- node.redundant(items, method = "wTO", type = "adapt")
 
 # partial correlation
-redund <- node.redundant(items, type = "pcor", method = "adapt")
+redund <- node.redundant(items, method = "pcor", type = "adapt")
 
 # check redundancies
 key.ind <- match(colnames(items), as.character(psychTools::spi.dictionary$item_id))
