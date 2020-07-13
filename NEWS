@@ -1,3 +1,59 @@
+Changes in version 0.9.6
+
+o UPDATE: `LCT` updated with deep learning neural network implementation
+
+
+
+Changes in version 0.9.5
+
+o ADD: loadings comparison test function added (see `LCT`)
+
+o FIX: named community memberships in `itemStability` and `dimStability`
+
+o UPDATE: `plot`, `print`, and `summary` methods all moved into single .R files (no effect on user's end)
+
+o UPDATE: `net.scores` global score is improved and computes scores very close to CFA scores
+
+o FIX: additional argument calls for `EGA.estimate` (and `EGA` by extension)
+
+o UPDATE: message from `EGA.estimate` (and `EGA` by extension) reports both 'gamma' and 'lambda.min.ratio' arguments
+
+o FIX: upper quantile output from `bootEGA`
+
+o FIX: minor bugs in `node.redundant`, `itemStability`, and `net.loads`
+
+
+Changes in version 0.9.4
+
+o MAJOR UPDATE: `dimStability` now computes proportion of exact dimension replications rather than items that replicate within dimension (this latter information can still be found in the output of `itemStability` under $mean.dim.rep)
+
+o FIX: `net.loads` for when dimensions equal one or the number of nodes in the network
+
+o FIX: naming typo with characters in `itemStability`
+
+o FIX: NAs in `dimStability`
+
+o FIX: weights of network in unidimensional structure of `EGA` are the same as multidimensional structure
+
+o UPDATE: Added a new function to simulate dynamic factor models `simDFM`
+
+o UPDATE: added internal functions for `net.loads` (see `utils-net.loads`)
+
+o FIX: ordering of names in `itemStability`
+
+o FIX: handling of NA communities in `net.loads`
+
+o UPDATE: Added output of the average replication of items in each dimension for `itemStability`
+
+o UPDATE: Revised 'Network Scores' vignette
+
+o UPDATE: `net.loads` functionality (cleaned up code)
+
+o UPDATE: S3Methods for `net.loads`
+
+o FIX: `net.scores` negative loadings corrected
+
+
 Changes in version 0.9.3
 
 o New function and print, summary and plot methods: dynEGA

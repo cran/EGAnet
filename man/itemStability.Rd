@@ -27,6 +27,10 @@ Returns a list containing:
 \item{item.replication}{The proportion of times each item replicated
 within the defined dimension}
 
+\item{mean.dim.rep}{The average replication proportion of items replicating
+in each dimension. More simply, the average of the \code{item.replication}
+output for each dimension}
+
 \item{item.dim.rep}{The proportion of times each item replicated
 within each possible dimension. Dimensions greater than the maximum
 number used in the \code{orig.wc} argument are labeled based on the
@@ -64,10 +68,9 @@ boot.wmt <- bootEGA(data = wmt, n = 100, typicalStructure = TRUE,
 plot.typicalStructure = TRUE, model = "glasso",
 type = "parametric", ncores = 4)
 
-}
-
 # Estimate item stability statistics
 itemStability(boot.wmt, orig.wc = ega.wmt$wc)
+}
 
 }
 \references{

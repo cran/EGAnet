@@ -22,7 +22,7 @@ ega <- EGA(neoOpen, model = "glasso", algorithm = "louvain")
 
 ## ----loadings, echo = TRUE, message = FALSE, warning = FALSE------------------
 # Standardized
-net.loads <- net.loads(A = ega)$std
+n.loads <- net.loads(A = ega)$std
 
 ## ----scores, echo = TRUE, message = FALSE, warning = FALSE--------------------
 # Network scores

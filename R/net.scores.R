@@ -1,22 +1,16 @@
 #' Network Scores
 #'
-#' @description This function computes network scores for
-#' factor analysis models. Network scores are computed based on
+#' @description This function computes network scores computed based on
 #' each node's \code{\link[NetworkToolbox]{strength}} within each
-#' community (i.e., factor) in the network. These values are used
-#' as network "factor loadings" for the weights of each item. Notably,
-#' network analysis allows nodes to load onto more than one factor.
-#' These loadings are considered in the factor scores. In addition,
+#' community (i.e., factor) in the network (see \code{\link[EGAnet]{net.loads}}).
+#' These values are used as network "factor loadings" for the weights of each item.
+#' Notably, network analysis allows nodes to contribution to more than one community.
+#' These loadings are considered in the network scores. In addition,
 #' if the construct is a hierarchy (e.g., personality questionnaire;
 #' items in facet scales in a trait domain), then an overall
-#' score can be computed (see argument \code{general}). These overall
-#' scores are computed using \code{\link[NetworkToolbox]{comm.close}}
-#' as weights, which are roughly similar to general factor loadings in a
-#' CFA model (see Christensen, Golino, & Silvia, 2019). The score
-#' estimates are roughly equivalent to the Maximum Likelihood method in
-#' \code{lavaan}'s \code{\link[lavaan]{cfa}} function. An important difference
+#' score can be computed (see argument \code{global}). An important difference
 #' is that the network scores account for cross-loadings in their
-#' estimation of scores.
+#' estimation of scores
 #'
 #' @param data Matrix or data frame.
 #' Must be a dataset
@@ -35,22 +29,26 @@
 #' If there is more than one dimension and there is theoretically
 #' one global dimension, then general loadings of the dimensions
 #' onto the global dimension can be included in the weighted
-#' scores. For the type of weights (e.g., sum score or latent),
-#' see the \code{type} argument
+#' scores
 #'
-#' @param type Character.
-#' Should network scores parallel sum scores or latent variable scores?
-#' Defaults to \code{"latent"}.
-#' Argument \code{type} sets the community centrality measure that is used
-#' when computing the network loadings for multiple factors.
-#' Simulations have shown that \code{\link[NetworkToolbox]{comm.eigen}} computes
-#' weights that are closer to sum scores while
-#' \code{\link[NetworkToolbox]{comm.close}} computes
-#' weights that are closer to latent variable scores.
-#' See Christensen, Golino, and Silvia (2019) for more details
+#' @param impute Character.
+#' In the presence of missing data, imputation can be implemented. Currently,
+#' three options are available:
 #'
-#' @param ... Additional arguments for \code{\link[igraph]{cluster_walktrap}}
-#' and \code{\link[NetworkToolbox]{louvain}} community detection algorithms
+#' \itemize{
+#'
+#' \item{\strong{\code{none}}}
+#' {No imputation is performed. This is the default.}
+#'
+#' \item{\strong{\code{mean}}}
+#' {The "mean" value of the columns are used to replace the missing data.}
+#'
+#' \item{\strong{\code{median}}}
+#' {The "median" value of the columns are used to replace the missing data.}
+#'
+#' }
+#'
+#' @param ... Additional arguments for \code{\link[EGAnet]{EGA}}
 #'
 #' @return Returns a list containing:
 #'
@@ -76,149 +74,126 @@
 #'  ega.wmt <- EGA(wmt)
 #' }
 #'
-#'  # Network scores
-#'  net.scores(data = wmt, A = ega.wmt)
+#' # Network scores
+#' net.scores(data = wmt, A = ega.wmt)
 #'
 #' @references
-#' Christensen, A. P. (2018).
-#' NetworkToolbox: Methods and measures for brain, cognitive, and psychometric network analysis in R.
-#' \emph{The R Journal}, \emph{10}, 422-439.
-#' doi: \href{https://doi.org/10.32614/RJ-2018-065}{10.32614/RJ-2018-065}
-#'
-#' Christensen, A. P., Golino, H. F., & Silvia, P. J. (2019).
-#' A psychometric network perspective on the measurement and assessment of personality traits.
+#' Christensen, A. P., & Golino, H. (under review).
+#' On the equivalency of factor and network loadings.
 #' \emph{PsyArXiv}.
-#' doi: \href{https://doi.org/10.31234/osf.io/ktejp}{10.31234/osf.io/ktejp}
+#' doi: \href{https://doi.org/10.31234/osf.io/xakez}{10.31234/osf.io/xakez}
+#'
+#' Christensen, A. P., Golino, H. F., & Silvia, P. J. (in press).
+#' A psychometric network perspective on the measurement and assessment of personality traits.
+#' \emph{European Journal of Personality}.
+#' doi: \href{https://doi.org/10.1002/per.2265}{10.1002/per.2265}
+#'
+#' Golino, H., Christensen, A. P., Moulder, R., Kim, S., & Boker, S. M. (under review).
+#' Modeling latent topics in social media using Dynamic Exploratory Graph Analysis: The case of the right-wing and left-wing trolls in the 2016 US elections.
+#' \emph{PsyArXiv}.
+#' doi: \href{https://doi.org/10.31234/osf.io/tfs7c}{10.31234/osf.io/tfs7c}
 #'
 #' @author Alexander P. Christensen <alexpaulchristensen@gmail.com> and Hudson F. Golino <hfg9s at virginia.edu>
 #'
 #' @export
 #'
 #Network Scores
-net.scores <- function (data, A, wc, global = FALSE,
-                        type = c("sumscore", "latent"), ...)
+#Updated: 06.12.2020
+net.scores <- function (data, A, wc, global = FALSE, impute = "none", ...)
 {
-  ####Missing arguments checks####
-  if(missing(data))
-  {stop("Argument 'data' is required for analysis")}
-
-  # Detect if input is an 'EGA' object
-  if(class(A) == "EGA")
-  {
-    #Compute network loadings
-    P <- net.loads(A)$std
-
-    # Grab communities
+  if (missing(data)) {
+    stop("Argument 'data' is required for analysis")
+  }
+  if (class(A) == "EGA") {
     wc <- A$wc
-
-    # Replace 'A' with 'EGA' network
     A <- A$network
-
-  }else if(missing(A))
-  {stop("Adjacency matrix is required for analysis")
-  }else if(missing(wc)) #Default to single  variable
-  {wc <- rep(1,ncol(data))}
-
-  if(missing(type))
-  {type <- "latent"
-  }else{type <- match.arg(type)}
-  ####Missing arguments checks####
-
-  #Compute network loadings
-  P <- net.loads(A=A,wc=wc)$std
-
-  #Number of factors
+  }
+  else if (missing(A)) {
+    stop("Adjacency matrix is required for analysis")
+  }
+  if (missing(impute)) {
+    impute <- "none"
+    warning("Argument 'impute' is missing. No imputation will be used.")
+  }
+  else if (missing(wc)) {
+    wc <- rep(1, ncol(data))
+  }
+  P <- net.loads(A = A, wc = wc, pos.manifold = TRUE)$std
   nfacts <- length(unique(wc))
-
-  #Initialize factor result matrix
-  if(nfacts > 1)
-  {
-    if(global)
-    {fact.res <- as.data.frame(matrix(0, nrow = nrow(data), ncol = (nfacts + 1)))
-    }else{fact.res <- as.data.frame(matrix(0, nrow = nrow(data), ncol = nfacts))}
-  }else{fact.res <- as.data.frame(matrix(0, nrow = nrow(data), ncol = nfacts))}
-
-  ####NETWORK SCORE FUNCTION####
-  net.score.fxn <- function(loads, data)
-  {
-    #Initialize participant  scores
-    net.sco <- matrix(0, nrow = nrow(data), ncol = ncol(loads))
-
-    #Compute  factor scores (ML)
-    for(i in 1:ncol(loads))
-    {
-      #Network loadings for each factor
-      f.load <- loads[which(loads[,i]!=0),i]
-
-      #Grab items associated with factor
-      dat <- data[,names(f.load)]
-
-      #Grab std dev of items associated with factor
-      f.sds <- apply(dat,2,sd,na.rm = TRUE)
-
-      #Obtain relative weights
-      rel <- f.load / f.sds
-      rel.wei <- rel / sum(rel)
-
-      #Compute scores
-      net.sco[,i] <- as.vector(rowSums(t(t(dat) * rel.wei)))
+  if (nfacts > 1) {
+    if (global) {
+      fact.res <- as.data.frame(matrix(0, nrow = nrow(data),
+                                       ncol = (nfacts + 1)))
     }
+    else {
+      fact.res <- as.data.frame(matrix(0, nrow = nrow(data),
+                                       ncol = nfacts))
+    }
+  }
+  else {
+    fact.res <- as.data.frame(matrix(0, nrow = nrow(data),
+                                     ncol = nfacts))
+  }
 
+  missing <- rowSums(is.na(data))
+  if (impute != "none") {
+    data <- data.matrix(data)
+    miss <- which(is.na(data), arr.ind = TRUE)
+    if (impute == "mean") {
+      item.means <- colMeans(data, na.rm = TRUE)
+      data[miss] <- item.means[miss[, 2]]
+    }
+    else {
+      item.med <- apply(data, 2, median, na.rm = TRUE)
+      data[miss] <- item.med[miss[, 2]]
+    }
+  }
+
+  net.score.fxn <- function(loads, data) {
+    net.sco <- matrix(0, nrow = nrow(data), ncol = ncol(loads))
+    for (i in 1:ncol(loads)) {
+      f.load <- loads[which(loads[, i] != 0), i]
+      names(f.load) <- row.names(loads)[which(loads[, i] !=
+                                                0)]
+      dat <- data[, names(f.load)]
+      f.sds <- apply(dat, 2, sd, na.rm = TRUE)
+      rel <- f.load/f.sds
+      rel.wei <- rel/sum(rel)
+      net.sco[, i] <- as.vector(rowSums(t(t(dat) * rel.wei), na.rm = TRUE))
+    }
     colnames(net.sco) <- colnames(loads)
-
     return(net.sco)
   }
-  ####NETWORK SCORE FUNCTION####
-
-  #Populate factor result matrix
   net.sco <- net.score.fxn(P, data)
-  fact.res[,1:nfacts] <- net.sco
-
-  if(nfacts > 1)
-  {colnames(fact.res)[1:nfacts] <- colnames(P)
-  }else{colnames(fact.res) <- "1"}
-
-  #Initialize results list
+  fact.res[, 1:nfacts] <- net.sco
+  if (nfacts > 1) {
+    colnames(fact.res)[1:nfacts] <- colnames(P)
+  }
+  else {
+    colnames(fact.res) <- "1"
+  }
   res <- list()
 
-  #Global network loadings
-  if(nfacts > 1)
-  {
-    if(global)
-    {
-      #Compute general network loadings
-      if(type == "latent")
-      {Pg <- NetworkToolbox::comm.close(A = A, comm = wc)
-      }else if(type == "sumscore")
-      {Pg <- NetworkToolbox::comm.eigen(A = A, comm = wc)}
-
-      #Overall score
-      G <- rowSums(t(t(net.sco) * Pg))
-      fact.res[,(nfacts + 1)] <- G
+  if (nfacts > 1) {
+    if (global) {
+      ega.gen <- suppressMessages(EGA(net.sco, plot.EGA = FALSE,
+                                      model = "glasso", ...))
+      C <- ega.gen$network
+      res$commCor <- C
+      nl.gen <- net.loads(A = ega.gen$network, wc = rep(1,
+                                                        ncol(net.sco)), min.load = 0, pos.manifold = TRUE)$std
+      sds.gen <- apply(net.sco, 2, sd, na.rm = TRUE)
+      rel.gen <- nl.gen/sds.gen
+      rel.wei.gen <- (rel.gen/sum(rel.gen)) + 1
+      G <- as.vector(rowSums(t(t(net.sco) * as.vector(as.matrix(rel.wei.gen)))))
+      fact.res[, (nfacts + 1)] <- G
       colnames(fact.res)[nfacts + 1] <- "Overall"
-
-      #Re-compute partial correlations between factors
-      invS <- -cov2cor(solve(cov(net.sco, use = "pairwise.complete.obs")))
-      diag(invS) <- 1
-      C <- invS
-    }else{
-
-      #Compute partial correlations between factors
-      invS <- -cov2cor(solve(cov(net.sco, use = "pairwise.complete.obs")))
-      diag(invS) <- 1
-      C <- invS
-
     }
-
-    #Return partial correlations between factors
-    res$commCor <- C
-
   }
-
-  res$unstd.scores <- round(fact.res,3)
-  res$std.scores <- round(apply(fact.res,2,scale),3)
+  res$unstd.scores <- as.data.frame(round(fact.res, 3))
+  res$std.scores <- as.data.frame(round(apply(fact.res, 2,
+                                              scale), 3))
   res$loads <- P
-
   return(res)
 }
 #----
