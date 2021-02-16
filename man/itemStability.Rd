@@ -18,7 +18,7 @@ Removes noise from table to allow for easier interpretation.
 Defaults to \code{.10}}
 
 \item{plot.item.rep}{Should the plot be produced for \code{item.replication}?
-If \code{TRUE}, then a plot for the \code{item.replication} output will be produced.#'
+If \code{TRUE}, then a plot for the \code{item.replication} output will be produced.
 Defaults to \code{TRUE}}
 }
 \value{
@@ -59,30 +59,50 @@ network loading for each item in each dimension (\code{item.loadings}).
 # Load data
 wmt <- wmt2[,7:24]
 
-\dontrun{
-# Estimate EGA network
-ega.wmt <- EGA(data = wmt, model = "glasso")
+\donttest{# Estimate EGA network
+## plot.type = "qqraph" used for CRAN checks
+## plot.type = "GGally" is the default
+ega.wmt <- EGA(data = wmt, model = "glasso", plot.type = "qgraph")
 
 # Estimate dimension stability
-boot.wmt <- bootEGA(data = wmt, n = 100, typicalStructure = TRUE,
-plot.typicalStructure = TRUE, model = "glasso",
-type = "parametric", ncores = 4)
+boot.wmt <- bootEGA(data = wmt, iter = 100, typicalStructure = TRUE,
+plot.typicalStructure = TRUE, model = "glasso", plot.type = "qgraph",
+type = "parametric", ncores = 2)
+}
 
 # Estimate item stability statistics
-itemStability(boot.wmt, orig.wc = ega.wmt$wc)
-}
+res <- itemStability(boot.wmt, orig.wc = ega.wmt$wc)
+
+# Changing plot features (ggplot2)
+## Changing colors (ignore warnings)
+### qgraph Defaults
+res$plot.itemStability + 
+    ggplot2::scale_color_manual(values = rainbow(max(res$uniq.num)))
+
+### Pastel
+res$plot.itemStability + 
+    ggplot2::scale_color_brewer(palette = "Pastel1")
+    
+## Changing Legend (ignore warnings)
+res$plot.itemStability + 
+    ggplot2::scale_color_discrete(labels = "Intelligence")
 
 }
 \references{
-Danon, L., Diaz-Guilera, A., Duch, J., & Arenas, A. (2005).
-Comparing community structure identification.
-\emph{Journal of Statistical Mechanics: Theory and Experiment}, \emph{9}, P09008.
-<doi:10.1088/1742-5468/2005/09/P09008>
+Christensen, A. P., & Golino, H. (2019).
+Estimating the stability of the number of factors via Bootstrap Exploratory Graph Analysis: A tutorial.
+\emph{PsyArXiv}.
+\doi{10.31234/osf.io/9deay}
+
+Christensen, A. P., Golino, H., & Silvia, P. J. (2020).
+A psychometric network perspective on the validity and validation of personality trait questionnaires.
+\emph{European Journal of Personality}.
+\doi{10.1002/per.2265}
 }
 \seealso{
 \code{\link[EGAnet]{EGA}} to estimate the number of dimensions of an instrument using EGA and
 \code{\link[EGAnet]{CFA}} to verify the fit of the structure suggested by EGA using confirmatory factor analysis.
 }
 \author{
-Hudson F. Golino <hfg9s at virginia.edu> and Alexander P. Christensen <alexpaulchristensen@gmail.com>
+Hudson Golino <hfg9s at virginia.edu> and Alexander P. Christensen <alexpaulchristensen@gmail.com>
 }

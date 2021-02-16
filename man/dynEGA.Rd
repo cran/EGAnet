@@ -14,11 +14,12 @@ dynEGA(
   group = NULL,
   use.derivatives = 1,
   model = c("glasso", "TMFG"),
+  model.args = list(),
   algorithm = c("walktrap", "louvain"),
-  plot.EGA = TRUE,
-  cor = c("cor_auto", "pearson", "spearman"),
-  steps = 4,
-  ncores
+  algorithm.args = list(),
+  corr = c("cor_auto", "pearson", "spearman"),
+  ncores,
+  ...
 )
 }
 \arguments{
@@ -68,7 +69,8 @@ Number of the column identifying group membership. Must be specified only if \co
 \item{use.derivatives}{Integer.
 The order of the derivative to be used in the EGA procedure. Default to 1.}
 
-\item{model}{A string indicating the network method to use (\code{\link{EGA.estimate}}).
+\item{model}{Character.
+A string indicating the method to use.
 Current options are:
 
 \itemize{
@@ -83,7 +85,12 @@ This is the default method}
 
 }}
 
-\item{algorithm}{A string indicating the community detection algorithm to use.
+\item{model.args}{List.
+A list of additional arguments for \code{\link[EGAnet]{EBICglasso.qgraph}}
+or \code{\link[NetworkToolbox]{TMFG}}}
+
+\item{algorithm}{A string indicating the algorithm to use or a function from \code{\link{igraph}}
+
 Current options are:
 
 \itemize{
@@ -96,11 +103,11 @@ Current options are:
 
 }}
 
-\item{plot.EGA}{Logical.
-If TRUE, returns a plot of the network and its estimated dimensions.
-Defaults to TRUE}
+\item{algorithm.args}{List.
+A list of additional arguments for \code{\link[igraph]{cluster_walktrap}}, \code{\link[igraph]{cluster_louvain}},
+or some other community detection algorithm function (see examples)}
 
-\item{cor}{Type of correlation matrix to compute. The default uses \code{\link[qgraph]{cor_auto}}.
+\item{corr}{Type of correlation matrix to compute. The default uses \code{\link[qgraph]{cor_auto}}.
 Current options are:
 
 \itemize{
@@ -118,9 +125,6 @@ the \code{\link[stats]{cor}}} function.
 the \code{\link[stats]{cor}}} function.
 }}
 
-\item{steps}{Number of steps to be used in \code{\link[igraph]{cluster_walktrap}} algorithm.
-Defaults to 4.}
-
 \item{ncores}{Numeric.
 Number of cores to use in computing results.
 Defaults to \code{parallel::detectCores() / 2} or half of your
@@ -130,6 +134,9 @@ Recommended to use maximum number of cores minus one
 
 If you're unsure how many cores your computer has,
 then use the following code: \code{parallel::detectCores()}}
+
+\item{...}{Additional arguments.
+Used for deprecated arguments from previous versions of \code{\link{EGA}}}
 }
 \description{
 Estimates dynamic factors in multivariate time series (i.e. longitudinal data, panel data, intensive longitudinal data) at multiple
@@ -139,46 +146,49 @@ EGA, dynEGA is a dynamic model that estimates the factor structure by modeling h
 GLLA is a filtering method for estimating derivatives from data that uses time delay embedding and a variant of Savitzky-Golay filtering to accomplish the task.
 }
 \examples{
-
-\donttest{
-# Population structure:
+\donttest{# Population structure:
+## plot.type = "qqraph" used for CRAN checks
+## plot.type = "GGally" is the default
 dyn.random <- dynEGA(data = sim.dynEGA, n.embed = 5, tau = 1,
 delta = 1, id = 21, group = 22, use.derivatives = 1,
 level = "population", model = "glasso", ncores = 2)
 
+plot(dyn.random, plot.type = "qgraph")
 
 # Group structure:
 dyn.group <- dynEGA(data = sim.dynEGA, n.embed = 5, tau = 1,
 delta = 1, id = 21, group = 22, use.derivatives = 1,
 level = "group", model = "glasso", ncores = 2)
 
-# Intraindividual structure:
+plot(dyn.group, ncol = 2, nrow = 1, plot.type = "qgraph")
 
-dyn.individual <- dynEGA(data = sim.dynEGA, n.embed = 5, tau = 1,
-delta = 1, id = 21, group = 22, use.derivatives = 1,
-level = "individual", model = "glasso", ncores = 2)
+# Intraindividual structure (commented out for CRAN tests):
+# dyn.individual <- dynEGA(data = sim.dynEGA, n.embed = 5, tau = 1,
+# delta = 1, id = 21, group = 22, use.derivatives = 1,
+# level = "individual", model = "glasso", ncores = 2)
 }
+
 }
 \references{
 Boker, S. M., Deboeck, P. R., Edler, C., & Keel, P. K. (2010)
 Generalized local linear approximation of derivatives from time series. In S.-M. Chow, E. Ferrer, & F. Hsieh (Eds.),
 \emph{The Notre Dame series on quantitative methodology. Statistical methods for modeling human dynamics: An interdisciplinary dialogue},
 (p. 161-178). \emph{Routledge/Taylor & Francis Group}.
-doi:\href{https://doi.org/10.1037/a0016622}{10.1037/a0016622}
+\doi{10.1037/a0016622}
 
 Deboeck, P. R., Montpetit, M. A., Bergeman, C. S., & Boker, S. M. (2009)
 Using derivative estimates to describe intraindividual variability at multiple time scales.
 \emph{Psychological Methods}, \emph{14(4)}, 367-386.
-doi:\href{https://doi.org/10.1037/a0016622}{10.1037/a0016622}
+\doi{10.1037/a0016622}
 
-Golino, H. F., & Epskamp, S. (2017).
-Exploratory graph analysis: A new approach for estimating the number of dimensions in psychological research.
-\emph{PloS one}, \emph{12(6)}, e0174035..
-doi: \href{https://doi.org/10.1371/journal.pone.0174035}{journal.pone.0174035}
+Golino, H., Christensen, A. P., Moulder, R. G., Kim, S., & Boker, S. M. (under review).
+Modeling latent topics in social media using Dynamic Exploratory Graph Analysis: The case of the right-wing and left-wing trolls in the 2016 US elections.
+\emph{PsyArXiv}.
+\doi{10.31234/osf.io/tfs7c}
 Savitzky, A., & Golay, M. J. (1964).
 Smoothing and differentiation of data by simplified least squares procedures.
 \emph{Analytical Chemistry}, \emph{36(8)}, 1627-1639.
-doi:\href{https://doi.org/10.1021/ac60214a047}{10.1021/ac60214a047}
+\doi{10.1021/ac60214a047}
 }
 \author{
 Hudson Golino <hfg9s at virginia.edu>

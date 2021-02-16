@@ -27,11 +27,7 @@ Returns a list containing:
 \item{bootstrap}{Prediction of model based on means of the loadings across
 the bootstrap replicate samples}
 
-\item{proportions}{Proportions of models suggested across bootstraps}
-
-\item{omnibus}{An omnibus prediction based on a consensus of empirical,
-bootstrap, and bootstrap proportions prediction. A consensus corresponds to
-any combination of two predictions returning the same prediction}
+\item{proportion}{Proportions of models suggested across bootstraps}
 }
 \description{
 An algorithm to identify whether data were generated from a
@@ -43,17 +39,24 @@ with 240,000 samples per model with varying parameters.
 \examples{
 \donttest{# Compute LCT
 ## Network model
-LCT(data = wmt2[,7:24])$omnibus
+LCT(data = wmt2[,7:24])
 
 ## Factor model
-LCT(data = NetworkToolbox::neoOpen)$omnibus}
+LCT(data = NetworkToolbox::neoOpen)}
 
 }
 \references{
-Christensen, A. P., & Golino, H. (2020).
+# Original implementation of LCT \cr
+Christensen, A. P., & Golino, H. (in press).
 On the equivalency of factor and network loadings.
+\emph{Behavior Research Methods}.
+\doi{10.31234/osf.io/xakez}
+
+# Current implementation of LCT \cr
+Christensen, A. P., & Golino, H. (under review).
+Random, factor, or network model? Predictions from neural networks.
 \emph{PsyArXiv}.
-doi:\href{https://doi.org/10.31234/osf.io/xakez}{10.31234/osf.io/xakez}
+\doi{10.31234/osf.io/awkcb}
 }
 \author{
 Hudson F. Golino <hfg9s at virginia.edu> and Alexander P. Christensen <alexpaulchristensen at gmail.com>

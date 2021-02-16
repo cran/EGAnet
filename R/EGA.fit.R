@@ -3,17 +3,17 @@
 #' @description Estimates the best fitting model using \code{\link[EGAnet]{EGA}}.
 #' The number of steps in the \code{\link[igraph]{cluster_walktrap}} detection
 #' algorithm is varied and unique community solutions are compared using
-#' \code{\link[EGAnet]{tefi}}. Also computes \code{\link[igraph]{cluster_louvain}}
-#' community detection algorithm.
+#' \code{\link[EGAnet]{tefi}}.
 #'
-#' @param data A dataset (or a correlation matrix).
+#' @param data Matrix or data frame.
+#' Dataset or correlation matrix
+#' 
+#' @param n Integer.
+#' Sample size (if the data provided is a correlation matrix)
 #'
 #' @param model Character.
 #' A string indicating the method to use.
-#' Defaults to \code{"glasso"}.
-#'
-#' @param n Integer.
-#' Sample size, if the data provided is a correlation matrix
+#' Defaults to \code{"glasso"}
 #'
 #' Current options are:
 #'
@@ -51,36 +51,53 @@
 #' # Load data
 #' wmt <- wmt2[,7:24]
 #'
-#' \dontrun{
-#' # Estimate normal EGAtmfg
-#' tmfg <- EGA(data = wmt, model = "TMFG")
+#' \donttest{# Estimate EGA
+#' ## plot.type = "qqraph" used for CRAN checks
+#' ## plot.type = "GGally" is the default
+#' ega.wmt <- EGA(data = wmt, plot.type = "qgraph")
 #'
-#' # Estimate optimal EGAtmfg
-#' tmfg.opt <- EGA.fit(data = wmt, model = "TMFG")
+#' # Estimate optimal EGA
+#' fit.wmt <- EGA.fit(data = wmt)
+#' 
+#' # Plot optimal fit
+#' plot(fit.wmt$EGA, plot.type = "qgraph")
 #'
 #' # Compare with CFA
-#' cfa.tmfg <- CFA(tmfg, estimator = "WLSMV", data = wmt)
-#' cfa.opt <- CFA(tmfg.opt$EGA, estimator = "WLSMV", data = wmt)
+#' cfa.ega <- CFA(ega.wmt, estimator = "WLSMV", data = wmt)
+#' cfa.fit <- CFA(fit.wmt$EGA, estimator = "WLSMV", data = wmt)
 #'
-#' lavaan::lavTestLRT(cfa.tmfg$fit, cfa.opt$fit, method = "satorra.bentler.2001")
-#'
-#'}
+#' lavaan::lavTestLRT(cfa.ega$fit, cfa.fit$fit, method = "satorra.bentler.2001")
+#' }
 #'
 #' @references
+#' # Entropy fit measures \cr
+#' Golino, H., Moulder, R. G., Shi, D., Christensen, A. P., Garrido, L. E., Neito, M. D., Nesselroade, J., Sadana, R., Thiyagarajan, J. A., & Boker, S. M. (in press).
+#' Entropy fit indices: New fit measures for assessing the structure and dimensionality of multiple latent variables.
+#' \emph{Multivariate Behavioral Research}.
+#' \doi{10.31234/osf.io/mtka2}
+#' 
+#' # Original implementation of EGA.fit \cr
+#' Golino, H., Thiyagarajan, J. A., Sadana, M., Teles, M., Christensen, A. P., & Boker, S. M. (under review).
+#' Investigating the broad domains of intrinsic capacity, functional ability, and environment:
+#' An exploratory graph analysis approach for improving analytical methodologies for measuring healthy aging.
+#' \emph{PsyArXiv}.
+#' \doi{10.31234/osf.io/hj5mc}
+#' 
+#' # Walktrap algorithm \cr
 #' Pons, P., & Latapy, M. (2006).
 #' Computing communities in large networks using random walks.
 #' \emph{Journal of Graph Algorithms and Applications}, \emph{10}, 191-218.
-#' doi:\href{https://doi.org/10.7155/jgaa.00185}{10.7155/jgaa.00185}
+#' \doi{10.7155/jgaa.00185}
 #'
 #' @seealso \code{\link[EGAnet]{bootEGA}} to investigate the stability of EGA's estimation via bootstrap,
 #' \code{\link[EGAnet]{EGA}} to estimate the number of dimensions of an instrument using EGA,
 #' and \code{\link[EGAnet]{CFA}} to verify the fit of the structure suggested by EGA using confirmatory factor analysis.
 #'
-#' @author Hudson F. Golino <hfg9s at virginia.edu> and Alexander P. Christensen <alexpaulchristensen@gmail.com>
+#' @author Hudson Golino <hfg9s at virginia.edu> and Alexander P. Christensen <alexpaulchristensen@gmail.com>
 #'
 #' @export
 # EGA fit
-# Updated 02.05.2020
+# Updated 11.11.2020
 EGA.fit <- function (data, model = c("glasso","TMFG"),
                      steps = c(3,4,5,6,7,8), n = NULL)
 {
@@ -91,6 +108,12 @@ EGA.fit <- function (data, model = c("glasso","TMFG"),
   if(missing(steps))
   {steps <- c(3,4,5,6,7,8)
   }else{steps <- steps}
+  
+  #Speed up process with data
+  if(nrow(data) != ncol(data)){
+    n <- nrow(data)
+    data <- qgraph::cor_auto(data)
+  }
 
   best.fit <- list()
 
@@ -104,29 +127,29 @@ EGA.fit <- function (data, model = c("glasso","TMFG"),
       {
         message(paste("Estimating EGA -- Walktrap model",i,"of",num,sep=" "))
         mods[[as.character(steps[i])]] <- EGA(data = data,
+                                              n = n,
                                               model = model,
-                                              steps = steps[i],
-                                              plot.EGA = FALSE,
-                                              n = n)
+                                              model.args = list(steps = steps[i]),
+                                              algorithm = "walktrap",
+                                              plot.EGA = FALSE)
 
         dims[,i] <- mods[[as.character(steps[i])]]$wc
       }
 
       colnames(dims) <- as.character(steps)
-
-      #check for unique number of dimensions
-      uniq.dim <- vector("numeric",length=(ncol(dims)))
-
-      for(i in 2:(ncol(dims)))
+      
+      #remove solutions with missing dimensions
+      rm.cols <- which(apply(apply(dims, 2, is.na), 2, any))
+      
+      if(length(rm.cols) != 0)
       {
-        uniq.dim[i] <- igraph::compare(dims[,i-1],dims[,i],method = "nmi")
-        names(uniq.dim) <- paste(steps,sep="")
+        dims <- dims[,-rm.cols]
+        steps <- steps[-rm.cols]
       }
 
-      uniq <- unique(as.matrix(uniq.dim))
-
-      step <- as.numeric(row.names(uniq)[which(uniq!=1)])
-
+      #check for unique number of dimensions
+      step <- as.numeric(colnames(dims)[which(!duplicated(homogenize.membership(dims[,1], dims), MARGIN = 2))])
+      
       len <- length(step)
 
       #if all models are the same
@@ -134,7 +157,9 @@ EGA.fit <- function (data, model = c("glasso","TMFG"),
       {
         best.fit$EGA <- mods[[1]]
         best.fit$steps <- 4
-        message("All EGA models are identical.")
+        Sys.sleep(1)
+        message("\nAll EGA models are identical.")
+        Sys.sleep(1)
       }else{
 
         ent.vec <- vector("numeric",length=len)
@@ -149,6 +174,20 @@ EGA.fit <- function (data, model = c("glasso","TMFG"),
         best.fit$EntropyFit <- ent.vec
         best.fit$Lowest.EntropyFit <- ent.vec[which(ent.vec==min(ent.vec))]
       }
+      
+  # Get information for EGA Methods section
+  args <- list()
+  
+  args$model <- model
+  args$algorithm <- "walktrap"
+  args$steps <- range(steps)
+  args$entropy <- best.fit$Lowest.EntropyFit
+  args$solutions <- best.fit$EntropyFit
+  
+  best.fit$Methods <- args
+      
+  class(best.fit) <- "EGA.fit"
+      
   return(best.fit)
 }
 #----

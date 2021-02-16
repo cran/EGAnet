@@ -11,26 +11,67 @@
 \alias{plot.NetLoads}
 \title{S3Methods for Plotting}
 \usage{
-\method{plot}{bootEGA}(x, vsize = 6, ...)
+\method{plot}{bootEGA}(x, plot.type = c("GGally", "qgraph"), plot.args = list(), ...)
 
 \method{plot}{CFA}(x, layout = "spring", vsize = 6, ...)
 
-\method{plot}{dynEGA}(x, title = "", vsize = 6,  ...)
+\method{plot}{dynEGA}(x, title = "", plot.type = c("GGally", "qgraph"), plot.args = list(), ...)
 
-\method{plot}{dynEGA.Groups}(x, ncol, nrow, title = "", vsize = 6,  ...)
+\method{plot}{dynEGA.Groups}(x, ncol, nrow, title = "",
+plot.type = c("GGally", "qgraph"), plot.args = list(),  ...)
 
-\method{plot}{dynEGA.Individuals}(x, title = "", vsize = 6,  id = NULL, ...)
+\method{plot}{dynEGA.Individuals}(x, title = "",  id = NULL,
+plot.type = c("GGally", "qgraph"), plot.args = list(), ...)
 
-\method{plot}{EGA}(x, title = "", vsize = 6,  ...)
+\method{plot}{EGA}(x, title = "", plot.type = c("GGally", "qgraph"), plot.args = list(), ...)
 
 \method{plot}{NetLoads}(x, ...)
 }
 \arguments{
 \item{x}{Object from \code{EGAnet} package}
 
-\item{vsize}{Numeric.
-Size of vertices in network plots.
-Defaults to \code{6}}
+\item{plot.type}{Character.
+Plot system to use.
+Current options are \code{\link[qgraph]{qgraph}} and \code{\link{GGally}}.
+Defaults to \code{"GGally"}.}
+
+\item{plot.args}{List.
+A list of additional arguments for the network plot.
+For \code{plot.type = "qgraph"}:
+
+\itemize{
+
+\item{\strong{\code{vsize}}}
+{Size of the nodes. Defaults to 6.}
+
+}
+For \code{plot.type = "GGally"} (see \code{\link[GGally]{ggnet2}} for
+full list of arguments):
+
+\itemize{
+
+\item{\strong{\code{vsize}}}
+{Size of the nodes. Defaults to 6.}
+
+\item{\strong{\code{label.size}}}
+{Size of the labels. Defaults to 5.}
+
+\item{\strong{\code{alpha}}}
+{The level of transparency of the nodes, which might be a single value or a vector of values. Defaults to 0.7.}
+
+\item{\strong{\code{edge.alpha}}}
+{The level of transparency of the edges, which might be a single value or a vector of values. Defaults to 0.4.}
+
+\item{\strong{\code{legend.names}}}
+{A vector with names for each dimension}
+
+\item{\strong{\code{color.palette}}}
+{The color palette for the nodes. For custom colors,
+enter HEX codes for each dimension in a vector.
+See \code{\link[EGAnet]{color_palette_EGA}} for 
+more details and examples}
+
+}}
 
 \item{...}{Arguments passed on to
 
@@ -43,6 +84,10 @@ Defaults to \code{6}}
 {Functions: CFA}
 
 }}
+
+\item{vsize}{Numeric.
+Size of vertices in \code{\link[EGAnet]{CFA}} plots.
+Defaults to \code{6}}
 
 \item{layout}{Character.
 Layout of plot (see \code{\link[semPlot]{semPaths}}).

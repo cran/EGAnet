@@ -16,9 +16,9 @@ library(EGAnet)
 library(NetworkToolbox)
 library(lavaan)
 
-## ----Fig1, fig.align = 'center', fig.pos = "H", echo = TRUE, message = FALSE, warning = FALSE----
+## ----Fig1, echo = TRUE, message = FALSE, warning = FALSE----------------------
 # Run EGA
-ega <- EGA(neoOpen, model = "glasso", algorithm = "louvain")
+ega <- EGA(neoOpen, model = "glasso", algorithm = "louvain", plot.EGA = FALSE)
 
 ## ----loadings, echo = TRUE, message = FALSE, warning = FALSE------------------
 # Standardized
@@ -30,36 +30,36 @@ net.scores <- net.scores(data = neoOpen, A = ega)
 
 ## ----latent scores setup, echo = FALSE, eval = TRUE, message = FALSE, warning = FALSE----
 # Latent variable scores
-## Estimate CFA
+# Estimate CFA
 output <- capture.output(cfa.net <- CFA(ega, estimator = "WLSMV", data = neoOpen, plot.CFA = FALSE))
 
-## Compute latent variable scores
+# Compute latent variable scores
 lv.scores <- lavPredict(cfa.net$fit)
 
-## Initialize correlations vector
+# Initialize correlations vector
 cors <- numeric(ega$n.dim)
 
-## Compute correlations
+# Compute correlations
 for(i in 1:ega$n.dim)
 {cors[i] <- cor(net.scores$std.scores[,i], lv.scores[,i], method = "spearman")}
 
-## Create matrix for table
+# Create matrix for table
 cors.mat <- as.matrix(round(cors,3))
 colnames(cors.mat) <- "Correlations"
 row.names(cors.mat) <- paste("Factor", 1:ega$n.dim)
 
 ## ----latent scores present, echo = TRUE, eval = FALSE, message = FALSE, warning = FALSE----
 #  # Latent variable scores
-#  ## Estimate CFA
+#  # Estimate CFA
 #  cfa.net <- CFA(ega, estimator = "WLSMV", data = neoOpen)
 #  
-#  ## Compute latent variable scores
+#  # Compute latent variable scores
 #  lv.scores <- lavPredict(cfa.net$fit)
 #  
-#  ## Initialize correlations vector
+#  # Initialize correlations vector
 #  cors <- numeric(ega$n.dim)
 #  
-#  ## Compute correlations
+#  # Compute correlations
 #  for(i in 1:ega$n.dim)
 #  {cors[i] <- cor(net.scores$std.scores[,i], lv.scores[,i], method = "spearman")}
 

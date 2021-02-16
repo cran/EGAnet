@@ -18,25 +18,32 @@
 #'
 #' @examples
 #' # Load data
-#' wmt <- wmt2[,7:24]
+#' dep <- depression[,24:44]
 #'
-#' \dontrun{
-#' # Estimate EGA model
-#' ega.wmt <- EGA(data = wmt, model = "glasso")
-#'
+#' \donttest{# Estimate EGA
+#' ## plot.type = "qqraph" used for CRAN checks
+#' ## plot.type = "GGally" is the default
+#' ega.dep <- EGA(data = dep, model = "glasso", plot.type = "qgraph")
+#' 
+#' # Compute entropy indices
+#' vn.entropy(data = ega.dep$correlation, structure = ega.dep$wc)
 #' }
 #'
-#' # Compute entropy indices
-#' vn.entropy(data = ega.wmt$correlation, structure = ega.wmt$wc)
-#'
+#' @references 
+#' Golino, H., Moulder, R. G., Shi, D., Christensen, A. P., Garrido, L. E., Neito, M. D., Nesselroade, J., Sadana, R., Thiyagarajan, J. A., & Boker, S. M. (2020).
+#' Entropy fit indices: New fit measures for assessing the structure and dimensionality of multiple latent variables.
+#' \emph{Multivariate Behavioral Research}.
+#' \doi{10.31234/osf.io/mtka2}
+#' 
 #' @seealso \code{\link[EGAnet]{EGA}} to estimate the number of dimensions of an instrument using EGA and
 #' \code{\link[EGAnet]{CFA}} to verify the fit of the structure suggested by EGA using confirmatory factor analysis.
 #'
-#' @author Hudson F. Golino <hfg9s at virginia.edu>, Alexander P. Christensen <alexpaulchristensen@gmail.com> and Robert Moulder <rgm4fd@virginia.edu>
+#' @author Hudson Golino <hfg9s at virginia.edu>, Alexander P. Christensen <alexpaulchristensen@gmail.com>, and Robert Moulder <rgm4fd@virginia.edu>
 #'
 #' @export
 #Entropy Fit Index
 # VN Entropy Function (for correlation matrices)
+# Updated 21.10.2020
 vn.entropy <- function(data, structure){
   if(!ncol(data)==nrow(data)){
     data <- qgraph::cor_auto(data)

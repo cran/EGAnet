@@ -78,33 +78,33 @@
 #' net.scores(data = wmt, A = ega.wmt)
 #'
 #' @references
-#' Christensen, A. P., & Golino, H. (under review).
+#' Christensen, A. P., & Golino, H. (2021).
 #' On the equivalency of factor and network loadings.
-#' \emph{PsyArXiv}.
-#' doi: \href{https://doi.org/10.31234/osf.io/xakez}{10.31234/osf.io/xakez}
+#' \emph{Behavior Research Methods}.
+#' \doi{10.3758/s13428-020-01500-6}
 #'
-#' Christensen, A. P., Golino, H. F., & Silvia, P. J. (in press).
+#' Christensen, A. P., Golino, H., & Silvia, P. J. (in press).
 #' A psychometric network perspective on the measurement and assessment of personality traits.
 #' \emph{European Journal of Personality}.
-#' doi: \href{https://doi.org/10.1002/per.2265}{10.1002/per.2265}
+#' \doi{10.1002/per.2265}
 #'
 #' Golino, H., Christensen, A. P., Moulder, R., Kim, S., & Boker, S. M. (under review).
 #' Modeling latent topics in social media using Dynamic Exploratory Graph Analysis: The case of the right-wing and left-wing trolls in the 2016 US elections.
 #' \emph{PsyArXiv}.
-#' doi: \href{https://doi.org/10.31234/osf.io/tfs7c}{10.31234/osf.io/tfs7c}
+#' \doi{10.31234/osf.io/tfs7c}
 #'
 #' @author Alexander P. Christensen <alexpaulchristensen@gmail.com> and Hudson F. Golino <hfg9s at virginia.edu>
 #'
 #' @export
 #'
 #Network Scores
-#Updated: 06.12.2020
-net.scores <- function (data, A, wc, global = FALSE, impute = "none", ...)
+#Updated: 27.12.2020
+net.scores <- function (data, A, wc, global = FALSE, impute, ...)
 {
   if (missing(data)) {
     stop("Argument 'data' is required for analysis")
   }
-  if (class(A) == "EGA") {
+  if (any(class(A) == "EGA")) {
     wc <- A$wc
     A <- A$network
   }
@@ -194,6 +194,10 @@ net.scores <- function (data, A, wc, global = FALSE, impute = "none", ...)
   res$std.scores <- as.data.frame(round(apply(fact.res, 2,
                                               scale), 3))
   res$loads <- P
+  
+  # Class
+  class(res) <- "NetScores"
+  
   return(res)
 }
 #----

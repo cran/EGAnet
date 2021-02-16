@@ -67,15 +67,14 @@ is computed using \code{\link[qgraph]{wi2net}} and returned.
 ### Using wmt2 dataset from EGAnet ###
 data(wmt2)
 
-\dontrun{
-# Compute correlations:
-CorMat <- cor_auto(wmt2[,7:24])
+\donttest{# Compute correlations:
+CorMat <- qgraph::cor_auto(wmt2[,7:24])
 
 # Compute graph with tuning = 0 (BIC):
-BICgraph <- EBICglasso.qgraph(CorMat, nrow(wmt2), 0)
+BICgraph <- EBICglasso.qgraph(CorMat, n = nrow(wmt2), gamma = 0)
 
 # Compute graph with tuning = 0.5 (EBIC)
-EBICgraph <- EBICglasso.qgraph(CorMat, nrow(wmt2), 0.5)
+EBICgraph <- EBICglasso.qgraph(CorMat, n = nrow(wmt2), gamma = 0.5)
 
 }
 
@@ -84,7 +83,7 @@ EBICgraph <- EBICglasso.qgraph(CorMat, nrow(wmt2), 0.5)
 Friedman, J., Hastie, T., & Tibshirani, R. (2008).
 Sparse inverse covariance estimation with the graphical lasso.
 \emph{Biostatistics}, \emph{9}, 432-441.
-doi: \href{https://doi.org/10.1093/biostatistics/kxm045}{10.1093/biostatistics/kxm045}
+\doi{10.1093/biostatistics/kxm045}
 
 #glasso package
 Jerome Friedman, Trevor Hastie and Rob Tibshirani (2011).

@@ -65,17 +65,26 @@
 #'
 #' if(interactive())
 #' {combine <- node.redundant.combine(named.nr)}
+#' 
+#' @references 
+#' Christensen, A. P., Golino, H., & Silvia, P. J. (in press).
+#' A psychometric network perspective on the validity and validation of personality trait questionnaires.
+#' \emph{European Journal of Personality}.
+#' \doi{10.1002/per.2265}
 #'
 #' @author Alexander Christensen <alexpaulchristensen@gmail.com>
 #'
 #' @export
 # Redundant Nodes Combination Function
-# Updated 08.03.2020
+# Updated 12.12.2020
 node.redundant.combine <- function (node.redundant.obj,
                                     type = c("sum", "latent"),
                                     estimator = "WLSMV",
                                     auto = FALSE, ...)
 {
+  # Deprecation warning
+  warning("`node.redundant.combine` has been deprecated and replaced with `UVA` (see `?UVA`). Future versions will not have this function")
+  
   # Check for node.redundant object class
   if(class(node.redundant.obj) != "node.redundant")
   {stop("A 'node.redundant' object must be used as input")}

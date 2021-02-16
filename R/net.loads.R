@@ -29,7 +29,7 @@
 #' Defaults to \code{FALSE}.
 #' Set to \code{TRUE} for a positive manifold
 #'
-#' @param plot Boolean.
+#' @param plot.NL Boolean.
 #' Should proportional loadings be plotted?
 #' Defaults to \code{FALSE}.
 #' Set to \code{TRUE} for plot with pie charts
@@ -75,29 +75,57 @@
 #' net.loads(ega.wmt)
 #'
 #' @references
-#' Christensen, A. P., & Golino, H. (2020).
+#' Christensen, A. P., & Golino, H. (2021).
 #' On the equivalency of factor and network loadings.
-#' \emph{PsyArXiv}.
-#' doi:\href{https://doi.org/10.31234/osf.io/xakez}{10.31234/osf.io/xakez}
+#' \emph{Behavior Research Methods}.
+#' \doi{10.3758/s13428-020-01500-6}
 #' 
-#' Christensen, A. P., Golino, H., & Silvia, P. (2019).
-#' A psychometric network perspective on the measurement and assessment of personality traits.
-#' \emph{PsyArXiv}.
-#' doi:\href{https://doi.org/10.31234/osf.io/ktejp}{10.31234/osf.io/ktejp}
+#' Christensen, A. P., Golino, H., & Silvia, P. J. (in press).
+#' A psychometric network perspective on the validity and validation of personality trait questionnaires.
+#' \emph{European Journal of Personality}.
+#' \doi{10.1002/per.2265}
 #'
-#' Hallquist, M., Wright, A. C. G., & Molenaar, P. C. M. (in press).
+#' Hallquist, M., Wright, A. C. G., & Molenaar, P. C. M. (2019).
 #' Problems with centrality measures in psychopathology symptom networks: Why network psychometrics cannot escape psychometric theory.
-#' \emph{Multivariate Behavioral Research}.
-#' doi:\href{https://doi.org/10.31234/osf.io/pg4mf}{10.31234/osf.io/pg4mf}
+#' \emph{Multivariate Behavioral Research}, 1-25.
+#' \doi{10.1080/00273171.2019.1640103}
 #'
-#' @author Alexander P. Christensen <alexpaulchristensen@gmail.com> and Hudson F. Golino <hfg9s at virginia.edu>
+#' @author Alexander P. Christensen <alexpaulchristensen@gmail.com> and Hudson Golino <hfg9s at virginia.edu>
 #'
 #' @export
 #'
 # Network Loadings
-# Updated 05.07.2020
-net.loads <- function(A, wc, pos.manifold = FALSE, min.load = 0, plot = FALSE)
+# Updated 14.12.2020
+net.loads <- function(A, wc, pos.manifold = FALSE, min.load = 0, plot.NL = FALSE)
 {
+  
+  # Function to order loadings largest to smallest
+  # within their respective factors
+  descend.ord <- function(loads, wc){
+    # Initialize ordering vector
+    ord.names <- vector("character")
+    
+    # Loop through dimensions
+    for(i in colnames(loads)){
+      ord <- order(loads[names(which(wc == i)),i], decreasing = TRUE)
+      ord.names <- c(ord.names, names(which(wc == i))[ord])
+    }
+    
+    # Reorder
+    reord <- loads[ord.names,]
+    
+    # Check for matrix
+    if(!is.matrix(reord)){
+      reord <- as.matrix(reord)
+    }
+    
+    # Make sure names
+    row.names(reord) <- ord.names
+    colnames(reord) <- colnames(loads)
+    
+    return(reord)
+  }
+  
   #------------------------------------------#
   ## DETECT EGA INPUT AND VARIABLE ORDERING ##
   #------------------------------------------#
@@ -113,6 +141,9 @@ net.loads <- function(A, wc, pos.manifold = FALSE, min.load = 0, plot = FALSE)
     # Replace 'A' with 'EGA' network
     A <- A$network
   }else{ord <- order(wc)} # Reorder by communities
+  
+  # Make sure membership is named
+  names(wc) <- colnames(A)
   
   # Check if there are actual dimensions
   if(length(wc) == length(unique(wc)))
@@ -174,7 +205,7 @@ net.loads <- function(A, wc, pos.manifold = FALSE, min.load = 0, plot = FALSE)
       #### START COMPUTE LOADINGS ####
       ################################
       
-      # Compute aboslute loadings
+      # Compute absolute loadings
       comm.str <- mat.func(A = A, wc = wc, absolute = TRUE, diagonal = 0)
       
       # Check for missing dimensions
@@ -193,7 +224,6 @@ net.loads <- function(A, wc, pos.manifold = FALSE, min.load = 0, plot = FALSE)
       # Add signs to loadings
       res.rev <- add.signs(comm.str = comm.str, A = A, wc = wc, dims = dims, pos.manifold = pos.manifold)
       comm.str <- res.rev$comm.str
-      A <- res.rev$A
       
       ##############################
       #### END COMPUTE LOADINGS ####
@@ -209,41 +239,48 @@ net.loads <- function(A, wc, pos.manifold = FALSE, min.load = 0, plot = FALSE)
       # Unstandardized loadings
       unstd <- as.data.frame(round(comm.str,3))
       row.names(unstd) <- colnames(A)
-      res$unstd <- unstd
+      res$unstd <- descend.ord(unstd, wc)
       
       # Standardized loadings
       if(length(dims)!=1)
       {std <- t(t(unstd) / sqrt(colSums(abs(unstd))))
       }else{std <- t(t(unstd) / sqrt(sum(abs(unstd))))}
-      res$std <- as.data.frame(round(std,3))
+      res$std <- as.data.frame(round(descend.ord(std, wc),3))
       
       #####################
       #### PLOT SET UP ####
       #####################
       
-      #Set to absolute for multidimensional
-      std.res <- as.matrix(abs(res$std))
-      
-      #Standardize by maximum rspbc
-      std.res <- std.res / rowSums(std.res)
-      
-      #Ensure that pie value is not greater than 1
-      std.res <- std.res - .001
-      std.res <- ifelse(std.res==-.001,0,std.res)
-      
-      #Split results to list for each node
-      pies <- split(std.res, rep(1:nrow(std.res)))
-      
-      # Plot (or not)
-      nl.plot <- qgraph::qgraph(A, layout = "spring", groups = as.factor(wc),
-                                label.prop = 1.5, pie = pies, vTrans = 200,
-                                negDashed = TRUE, DoNotPlot = ifelse(plot,FALSE,TRUE))
-      
-      # Remove loadings (added as attribute)
-      ## S3Methods summary and print
-      res$MinLoad <- min.load
-      ## S3Methods plot
-      res$plot <- nl.plot
+      if(plot.NL){
+        
+        #Set to absolute for multidimensional
+        std.res <- as.matrix(abs(res$std))
+        
+        #Standardize
+        std.res <- std.res / rowSums(std.res)
+        
+        #Ensure that pie value is not greater than 1
+        std.res <- std.res - .001
+        std.res <- ifelse(std.res==-.001,0,std.res)
+        
+        # Reorder to match membership
+        std.res <- std.res[,levels(as.factor(wc))]
+        
+        #Split results to list for each node
+        pies <- split(std.res, rep(1:nrow(std.res)))
+        
+        # Plot (or not)
+        nl.plot <- qgraph::qgraph(A, layout = "spring", groups = as.factor(wc),
+                                  label.prop = 1, pie = pies, vTrans = 200,
+                                  negDashed = TRUE, DoNotPlot = ifelse(plot,FALSE,TRUE))
+        
+        # Remove loadings (added as attribute)
+        ## S3Methods summary and print
+        res$MinLoad <- min.load
+        ## S3Methods plot
+        res$plot <- nl.plot
+        
+      }
       
     }else if(all(is.na(wc)))
     {
@@ -272,7 +309,6 @@ net.loads <- function(A, wc, pos.manifold = FALSE, min.load = 0, plot = FALSE)
       # Add signs to loadings
       res.rev <- add.signs(comm.str = comm.str, A = A, wc = wc, dims = dims, pos.manifold = pos.manifold)
       comm.str <- res.rev$comm.str
-      A <- res.rev$A
       
       # Initialize result list
       res <- list()
@@ -280,13 +316,13 @@ net.loads <- function(A, wc, pos.manifold = FALSE, min.load = 0, plot = FALSE)
       # Unstandardized loadings
       unstd <- as.data.frame(round(comm.str,3))
       row.names(unstd) <- colnames(A)
-      res$unstd <- unstd
+      res$unstd <- descend.ord(unstd, wc)
       
       # Standardized loadings
       if(length(dims)!=1)
       {std <- t(t(unstd) / sqrt(colSums(abs(unstd))))
       }else{std <- t(t(unstd) / sqrt(sum(abs(unstd))))}
-      res$std <- as.data.frame(round(std,3))
+      res$std <- as.data.frame(round(descend.ord(std, wc),3))
       
     }
     

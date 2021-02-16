@@ -51,11 +51,7 @@
 #' @param use.derivatives Integer.
 #' The order of the derivative to be used in the EGA procedure. Default to 1.
 #'
-#' @param plot.EGA Logical.
-#' If TRUE, returns a plot of the network and its estimated dimensions.
-#' Defaults to TRUE
-#'
-#' @param cor Type of correlation matrix to compute. The default uses \code{\link[qgraph]{cor_auto}}.
+#' @param corr Type of correlation matrix to compute. The default uses \code{\link[qgraph]{cor_auto}}.
 #' Current options are:
 #'
 #' \itemize{
@@ -73,7 +69,8 @@
 #' the \code{\link[stats]{cor}}} function.
 #' }
 #'
-#' @param model A string indicating the network method to use (\code{\link{EGA.estimate}}).
+#' @param model Character.
+#' A string indicating the method to use.
 #' Current options are:
 #'
 #' \itemize{
@@ -88,7 +85,12 @@
 #'
 #' }
 #'
-#' @param algorithm A string indicating the community detection algorithm to use.
+#' @param model.args List.
+#' A list of additional arguments for \code{\link[EGAnet]{EBICglasso.qgraph}}
+#' or \code{\link[NetworkToolbox]{TMFG}}
+#'
+#' @param algorithm A string indicating the algorithm to use or a function from \code{\link{igraph}}
+#'
 #' Current options are:
 #'
 #' \itemize{
@@ -101,8 +103,9 @@
 #'
 #' }
 #'
-#' @param steps Number of steps to be used in \code{\link[igraph]{cluster_walktrap}} algorithm.
-#' Defaults to 4.
+#' @param algorithm.args List.
+#' A list of additional arguments for \code{\link[igraph]{cluster_walktrap}}, \code{\link[igraph]{cluster_louvain}},
+#' or some other community detection algorithm function (see examples)
 #'
 #' @param ncores Numeric.
 #' Number of cores to use in computing results.
@@ -114,69 +117,103 @@
 #' If you're unsure how many cores your computer has,
 #' then use the following code: \code{parallel::detectCores()}
 #'
+#' @param ... Additional arguments.
+#' Used for deprecated arguments from previous versions of \code{\link{EGA}}
 #'
 #' @author Hudson Golino <hfg9s at virginia.edu>
 #'
 #' @examples
+#' \donttest{# Population structure:
+#' ## plot.type = "qqraph" used for CRAN checks
+#' ## plot.type = "GGally" is the default
+#' dyn.random <- dynEGA(data = sim.dynEGA, n.embed = 5, tau = 1,
+#' delta = 1, id = 21, group = 22, use.derivatives = 1,
+#' level = "population", model = "glasso", ncores = 2)
+#' 
+#' plot(dyn.random, plot.type = "qgraph")
 #'
-#' \donttest{
-#' # Population structure:
-#'dyn.random <- dynEGA(data = sim.dynEGA, n.embed = 5, tau = 1,
-#'delta = 1, id = 21, group = 22, use.derivatives = 1,
-#'level = "population", model = "glasso", ncores = 2)
+#' # Group structure:
+#' dyn.group <- dynEGA(data = sim.dynEGA, n.embed = 5, tau = 1,
+#' delta = 1, id = 21, group = 22, use.derivatives = 1,
+#' level = "group", model = "glasso", ncores = 2)
+#' 
+#' plot(dyn.group, ncol = 2, nrow = 1, plot.type = "qgraph")
 #'
-#'
-#'# Group structure:
-#'dyn.group <- dynEGA(data = sim.dynEGA, n.embed = 5, tau = 1,
-#'delta = 1, id = 21, group = 22, use.derivatives = 1,
-#'level = "group", model = "glasso", ncores = 2)
-#'
-#'# Intraindividual structure:
-#'
-#'dyn.individual <- dynEGA(data = sim.dynEGA, n.embed = 5, tau = 1,
-#'delta = 1, id = 21, group = 22, use.derivatives = 1,
-#'level = "individual", model = "glasso", ncores = 2)
+#' # Intraindividual structure (commented out for CRAN tests):
+#' # dyn.individual <- dynEGA(data = sim.dynEGA, n.embed = 5, tau = 1,
+#' # delta = 1, id = 21, group = 22, use.derivatives = 1,
+#' # level = "individual", model = "glasso", ncores = 2)
 #'}
-#' @references
 #'
+#' @references
 #' Boker, S. M., Deboeck, P. R., Edler, C., & Keel, P. K. (2010)
 #' Generalized local linear approximation of derivatives from time series. In S.-M. Chow, E. Ferrer, & F. Hsieh (Eds.),
 #' \emph{The Notre Dame series on quantitative methodology. Statistical methods for modeling human dynamics: An interdisciplinary dialogue},
 #' (p. 161-178). \emph{Routledge/Taylor & Francis Group}.
-#' doi:\href{https://doi.org/10.1037/a0016622}{10.1037/a0016622}
+#' \doi{10.1037/a0016622}
 #'
 #' Deboeck, P. R., Montpetit, M. A., Bergeman, C. S., & Boker, S. M. (2009)
 #' Using derivative estimates to describe intraindividual variability at multiple time scales.
 #' \emph{Psychological Methods}, \emph{14(4)}, 367-386.
-#' doi:\href{https://doi.org/10.1037/a0016622}{10.1037/a0016622}
+#' \doi{10.1037/a0016622}
 #'
-#' Golino, H. F., & Epskamp, S. (2017).
-#' Exploratory graph analysis: A new approach for estimating the number of dimensions in psychological research.
-#' \emph{PloS one}, \emph{12(6)}, e0174035..
-#' doi: \href{https://doi.org/10.1371/journal.pone.0174035}{journal.pone.0174035}
+#' Golino, H., Christensen, A. P., Moulder, R. G., Kim, S., & Boker, S. M. (under review).
+#' Modeling latent topics in social media using Dynamic Exploratory Graph Analysis: The case of the right-wing and left-wing trolls in the 2016 US elections.
+#' \emph{PsyArXiv}.
+#' \doi{10.31234/osf.io/tfs7c}
 
 #' Savitzky, A., & Golay, M. J. (1964).
 #' Smoothing and differentiation of data by simplified least squares procedures.
 #' \emph{Analytical Chemistry}, \emph{36(8)}, 1627-1639.
-#' doi:\href{https://doi.org/10.1021/ac60214a047}{10.1021/ac60214a047}
-#'
+#' \doi{10.1021/ac60214a047}
 #'
 #' @importFrom stats cor rnorm runif na.omit
 #'
 #' @export
 # dynEGA
-# Updated 15.06.2020
-#'
+# Updated 17.12.2020
 dynEGA <- function(data, n.embed, tau = 1, delta = 1,
                    level = c("individual", "group", "population"),
                    id = NULL, group = NULL,
                    use.derivatives = 1,
-                   model = c("glasso", "TMFG"),
-                   algorithm = c("walktrap", "louvain"),
-                   plot.EGA = TRUE,
-                   cor = c("cor_auto", "pearson", "spearman"),
-                   steps = 4,
-                   ncores){
+                   model = c("glasso", "TMFG"), model.args = list(),
+                   algorithm = c("walktrap", "louvain"), algorithm.args = list(),
+                   corr = c("cor_auto", "pearson", "spearman"),
+                   ncores, ...){
+
+  # Get additional arguments
+  add.args <- list(...)
+
+  # Check if steps has been input as an argument
+  if("steps" %in% names(add.args)){
+
+    # Give deprecation warning
+    warning(
+      paste(
+        "The 'steps' argument has been deprecated in all EGA functions.\n\nInstead use: algorithm.args = list(steps = ", add.args$steps, ")",
+        sep = ""
+      )
+    )
+
+    # Handle the number of steps appropriately
+    algorithm.args$steps <- add.args$steps
+  }
+
+  # Check if cor has been input as an argument
+  if("cor" %in% names(add.args)){
+
+    # Give deprecation warning
+    warning(
+      paste(
+        "The 'cor' argument has been deprecated in dynEGA.\n\nInstead use: corr = ", add.args$cor, ")",
+        sep = ""
+      )
+    )
+
+    # Handle the number of steps appropriately
+    corr <- add.args$cor
+  }
+
   #### MISSING ARGUMENTS HANDLING ####
   if(missing(id))
   {stop("The 'id' argument is missing! \n The number of the column identifying each individual must be provided!")
@@ -194,9 +231,9 @@ dynEGA <- function(data, n.embed, tau = 1, delta = 1,
   {group <- ncol(data)+1
   }else{group <- group}
 
-  if(missing(cor))
-  {cor <- "cor_auto"
-  }else{cor <- match.arg(cor)}
+  if(missing(corr))
+  {corr <- "cor_auto"
+  }else{corr <- match.arg(corr)}
 
   if(missing(ncores))
   {ncores <- ceiling(parallel::detectCores() / 2)
@@ -274,17 +311,21 @@ dynEGA <- function(data, n.embed, tau = 1, delta = 1,
 
     if(use.derivatives == 0){
       ega1 <- EGA.estimate(data = data.all[,1:ncol(data[,-c(id, group)])],
-                           model = model, algorithm = algorithm,
-                           steps = steps, cor = cor)}
+                           model = model, model.args = model.args,
+                           algorithm = algorithm, algorithm.args = algorithm.args,
+                           corr = corr)}
     if(use.derivatives == 1){
       ega1 <- EGA.estimate(data = data.all[,(ncol(data[,-c(id, group)])+1):(ncol(data[,-c(id, group)])*2)],
-                           model = model, algorithm = algorithm,
-                           steps = steps, cor = cor)}
+                           model = model, model.args = model.args,
+                           algorithm = algorithm, algorithm.args = algorithm.args,
+                           corr = corr)}
     if(use.derivatives==2){
       init <- (ncol(data[,-c(id, group)])*2)+1
       cols <- seq(from = init, to = init+ncol(data[,-c(id, group)])-1)
-      ega1 <- EGA.estimate(data = data.all[,cols], model = model, algorithm = algorithm,
-                           steps = steps, cor = cor)}
+      ega1 <- EGA.estimate(data = data.all[,cols],
+                           model = model, model.args = model.args,
+                           algorithm = algorithm, algorithm.args = algorithm.args,
+                           corr = corr)}
   }
 
   parallel::stopCluster(cl)
@@ -332,8 +373,9 @@ dynEGA <- function(data, n.embed, tau = 1, delta = 1,
     #Compute derivatives per Group
     ega.list.groups <- pbapply::pblapply(X = data.groups, cl = cl,
                                          FUN = EGA.estimate,
-                                         model = model, algorithm = algorithm,
-                                         steps = steps, cor = cor)
+                                         model = model, model.args = model.args,
+                                         algorithm = algorithm, algorithm.args = algorithm.args,
+                                         corr = corr)
     parallel::stopCluster(cl)
   }
 
@@ -373,8 +415,9 @@ dynEGA <- function(data, n.embed, tau = 1, delta = 1,
 
     ega.list.individuals <- pbapply::pblapply(X = data.individuals, cl = cl,
                                               FUN = EGA.estimate,
-                                              model = model, algorithm = algorithm,
-                                              steps = steps, cor = cor)
+                                              model = model, model.args = model.args,
+                                              algorithm = algorithm, algorithm.args = algorithm.args,
+                                              corr = corr)
     parallel::stopCluster(cl)
   }
 

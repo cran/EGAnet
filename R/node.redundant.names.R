@@ -39,14 +39,23 @@
 #' # change names in redundancy output to questionnaire item description
 #' named.nr <- node.redundant.names(redund, key)
 #' }
+#' 
+#' @references 
+#' Christensen, A. P., Golino, H., & Silvia, P. J. (in press).
+#' A psychometric network perspective on the validity and validation of personality trait questionnaires.
+#' \emph{European Journal of Personality}.
+#' \doi{10.1002/per.2265}
 #'
 #' @author Alexander Christensen <alexpaulchristensen@gmail.com>
 #'
 #' @export
 # Node Redundant Naming Function
-# Updated 13.02.2020
+# Updated 12.12.2020
 node.redundant.names <- function(node.redundant.obj, key)
 {
+  # Deprecation warning
+  warning("`node.redundant.names` has been deprecated and replaced with `UVA` (see `?UVA`). Future versions will not have this function")
+  
   # Check for node.redundant object class
   if(class(node.redundant.obj) != "node.redundant")
   {stop("A 'node.redundant' object must be used as input")}
@@ -81,7 +90,8 @@ node.redundant.names <- function(node.redundant.obj, key)
     # Replace item names with description
     node.redundant.obj$redundant[[i]] <- as.character(key.chn[target.o])
   }
-
+  
+  # Create key code
   names(key) <- colnames(data)
   node.redundant.obj$key <- key
 

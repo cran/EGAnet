@@ -8,8 +8,10 @@ node.redundant(
   data,
   n = NULL,
   sig,
-  method = c("wTO", "pcor", "thresh"),
-  type = c("alpha", "bonferroni", "FDR", "adapt")
+  method = c("wTO", "pcor", "cor"),
+  thresh = TRUE,
+  type = c("alpha", "adapt"),
+  plot = FALSE
 )
 }
 \arguments{
@@ -22,24 +24,42 @@ If input in \code{data} is a correlation matrix and
 Defaults to NULL}
 
 \item{sig}{Numeric.
-\emph{p}-value for significance of overlap (defaults to \code{.05}).
-If more than 200 connections, then \code{\link[fdrtool]{fdrtool}}
-is used to correct for false positives. In these instances, \code{sig}
-sets the \emph{q}-value for significance of overlap (defaults to \code{.10})}
+\emph{p}-value for significance of overlap (defaults to \code{.05})}
 
 \item{method}{Character.
 Computes weighted topological overlap (\code{"wTO"} using \code{\link[qgraph]{EBICglasso}}),
-partial correlations (\code{"pcor"}), or thresholding
-based on a certain level of partial correlations (\code{"thresh"}).
-\code{method = "thresh"} will use the argument \code{"sig"} to input
-the desired threshold (defaults to \code{sig = .20}).}
+partial correlations (\code{"pcor"}), and correlations (\code{"cor"}).
+Defaults to \code{"wTO"}}
 
-\item{type}{Character.
+\item{thresh}{Boolean.
+Should a threshold be applied?
+Defaults to \code{TRUE}.
+If \code{TRUE}, then based on a certain threshold only redundancies
+above that value will be returned.
+Uses argument \code{"sig"} to input the desired threshold.
+Defaults for each method:
+
+\itemize{
+
+\item{\code{"wTO"}}
+{.20}
+
+\item{\code{"pcor"}}
+{.20}
+
+\item{\code{"cor"}}
+{.70}
+
+}}
+
+\item{type}{Character. Type of significance.
 Computes significance using the standard \emph{p}-value (\code{"alpha"}),
-bonferroni corrected \emph{p}-value (\code{"bonferroni"}),
-false-discovery rate corrected \emph{p}-value (\code{"FDR"}),
 or adaptive alpha \emph{p}-value (\code{\link[NetworkToolbox]{adapt.a}}).
 Defaults to \code{"adapt"}}
+
+\item{plot}{Boolean.
+Should redundancies be plotted in a network plot?
+Defaults to \code{FALSE}}
 }
 \value{
 Returns a list:
@@ -53,6 +73,24 @@ to redundant nodes with the name of object in the list}
 or partial correlations}
 
 \item{network}{The network compute by \code{\link[qgraph]{EBICglasso}}}
+
+\item{descriptives}{
+
+\itemize{
+
+\item{basic}{A vector containing the mean, standard deviation,
+median, median absolute deviation (MAD), 3 times the MAD, 6 times the MAD,
+minimum, maximum, and critical value for the overlap measure
+(i.e., weighted topological overlap, partial correlation, or threshold)}
+
+\item{centralTendency}{A matrix for all (aboslute) non-zero values and their
+respective standard deviation from the mean and median absolute deviation
+from the median}
+
+}
+}
+
+\item{distribution}{Distribution that was used to determine significance}
 }
 \description{
 Identifies redundant nodes in the network based on several
@@ -66,27 +104,33 @@ and the function \link[wTO]{wTO} from the wTO package.
 items <- psychTools::spi[,c(11:20)]
 
 # weighted topological overlap
-redund <- node.redundant(items, method = "wTO", type = "adapt")
+redund <- node.redundant(items, method = "wTO", type = "adapt", plot = TRUE)
 
 # partial correlation
-redund <- node.redundant(items, method = "pcor", type = "adapt")
+redund <- node.redundant(items, method = "pcor", type = "adapt", plot = TRUE)
 
 # threshold
-redund <- node.redundant(items, method = "thresh", sig = .20)
+redund <- node.redundant(items, method = "pcor", thresh = TRUE, sig = .20, plot = TRUE)
 
 }
 \references{
-# simulation using node.redundant
+# Simulation using node.redundant \cr
 Christensen, A. P. (2020).
 Towards a network psychometrics approach to assessment: Simulations for redundancy, dimensionality, and loadings
 (Unpublished doctoral dissertation). University of North Carolina at Greensboro, Greensboro, NC, USA.
-https://doi.org/10.31234/osf.io/84kgd
+\doi{10.31234/osf.io/84kgd}
 
-# wTO
+# Implementation of node.redundant \cr
+Christensen, A. P., Golino, H., & Silvia, P. J. (in press).
+A psychometric network perspective on the validity and validation of personality trait questionnaires.
+\emph{European Journal of Personality}.
+\doi{10.1002/per.2265}
+
+# wTO measure \cr
 Nowick, K., Gernat, T., Almaas, E., & Stubbs, L. (2009).
 Differences in human and chimpanzee gene expression patterns define an evolving network of transcription factors in brain.
 \emph{Proceedings of the National Academy of Sciences}, \emph{106}, 22358-22363.
-https://doi.org/10.1073/pnas.0911376106
+\doi{10.1073/pnas.0911376106}
 }
 \author{
 Alexander Christensen <alexpaulchristensen@gmail.com>

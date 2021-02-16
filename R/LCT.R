@@ -27,32 +27,35 @@
 #' \item{bootstrap}{Prediction of model based on means of the loadings across
 #' the bootstrap replicate samples}
 #' 
-#' \item{proportions}{Proportions of models suggested across bootstraps}
-#' 
-#' \item{omnibus}{An omnibus prediction based on a consensus of empirical,
-#' bootstrap, and bootstrap proportions prediction. A consensus corresponds to
-#' any combination of two predictions returning the same prediction}
+#' \item{proportion}{Proportions of models suggested across bootstraps}
 #'
 #' @examples
 #' \donttest{# Compute LCT
 #' ## Network model
-#' LCT(data = wmt2[,7:24])$omnibus
+#' LCT(data = wmt2[,7:24])
 #' 
 #' ## Factor model
-#' LCT(data = NetworkToolbox::neoOpen)$omnibus}
+#' LCT(data = NetworkToolbox::neoOpen)}
 #' 
 #' @references
-#' Christensen, A. P., & Golino, H. (2020).
+#' # Original implementation of LCT \cr
+#' Christensen, A. P., & Golino, H. (in press).
 #' On the equivalency of factor and network loadings.
+#' \emph{Behavior Research Methods}.
+#' \doi{10.31234/osf.io/xakez}
+#' 
+#' # Current implementation of LCT \cr
+#' Christensen, A. P., & Golino, H. (under review).
+#' Random, factor, or network model? Predictions from neural networks.
 #' \emph{PsyArXiv}.
-#' doi:\href{https://doi.org/10.31234/osf.io/xakez}{10.31234/osf.io/xakez}
+#' \doi{10.31234/osf.io/awkcb}
 #' 
 #' @importFrom utils setTxtProgressBar txtProgressBar
 #'
 #' @export
 #'
 # Loadings Comparison Test----
-# Updated 12.07.2020
+# Updated 24.12.2020
 LCT <- function (data, n, iter = 100)
 {
   # Convert data to matrix
@@ -69,7 +72,6 @@ LCT <- function (data, n, iter = 100)
   
   # Initialize network loading matrix
   nl <- matrix(0, nrow = iter, ncol = 5)
-  colnames(nl) <- c("Small", "Moderate", "Large", "Dominant", "Cross")
   fl <- nl
   
   # Initialize count
@@ -91,10 +93,10 @@ LCT <- function (data, n, iter = 100)
         if(count == 1) {
           dat <- data
         } else {
-          dat <- mvtnorm::rmvnorm(cases, sigma = cov(data, use = "pairwise.complete.obs"))
+          dat <- MASS::mvrnorm(cases, mu = rep(0, ncol(data)), Sigma = cov(data, use = "pairwise.complete.obs"))
         }
-      
-        cor.mat <- cor(dat, use = "pairwise.complete.obs")
+        
+        cor.mat <- qgraph::cor_auto(dat)
         
       }else{
         
@@ -102,24 +104,27 @@ LCT <- function (data, n, iter = 100)
           cor.mat <- data
         } else {
           
-          dat <- mvtnorm::rmvnorm(cases, sigma = data)
+          dat <- MASS::mvrnorm(cases, mu = rep(0, ncol(data)), Sigma = data)
           
-          cor.mat <- cor(dat, use = "pairwise.complete.obs")
+          cor.mat <- qgraph::cor_auto(dat)
         }
         
       }
       
       # Make sure there are column names
-      colnames(cor.mat) <- paste("V", 1:ncol(cor.mat), sep = "")
+      if(is.null(colnames(cor.mat)))
+      {colnames(cor.mat) <- paste("V", 1:ncol(cor.mat), sep = "")}
       
       # Estimate network
-      net <- try(suppressWarnings(suppressMessages(EGA.estimate(cor.mat, n = cases))), silent = TRUE)
+      if(count == 1)
+      {net <- try(suppressWarnings(suppressMessages(EGA(cor.mat, n = cases, uni = FALSE, plot.EGA = FALSE))), silent = TRUE)
+      }else{net <- try(suppressWarnings(suppressMessages(EGA.estimate(cor.mat, n = cases))), silent = TRUE)}
       
       if(any(class(net) == "try-error"))
       {good <- FALSE
       }else{
         
-        if(length(unique(net$wc)) == 1 | length(net$wc) == length(unique(net$wc)))
+        if(length(net$wc) == length(unique(net$wc)))
         {good <- FALSE
         }else{
           # Try to estimate network loadings
@@ -127,37 +132,49 @@ LCT <- function (data, n, iter = 100)
           
           if(any(class(n.loads) == "try-error"))
           {good <- FALSE
-          }else if(ncol(n.loads) == 1)
-          {good <- FALSE
           }else{
             
+            # Check for single variable dimensions
+            if(nrow(n.loads) != length(net$wc)){
+              warning("One or more dimensions were identified as a single variable. These variables were removed from the comparison for both network and factor models.")
+            }
+            
             # Reorder network loadings
-            n.loads <- n.loads[names(net$wc),]
+            n.loads <- as.matrix(n.loads[match(names(net$wc), row.names(n.loads)),])
             
             # Get network loading proportions
             n.low <- mean(n.loads >= 0.15, na.rm = TRUE)
             n.mod <- mean(n.loads >= 0.25, na.rm = TRUE)
             n.high <- mean(n.loads >= 0.35, na.rm = TRUE)
             
-            # Initialize dominate loadings
-            n.dom <- numeric(ncol(data))
-            n.loads2 <- n.loads
-            
-            for(i in 1:ncol(n.loads))
+            if(ncol(n.loads) != 1)
             {
-              n.dom[which(net$wc == i)] <- n.loads[which(net$wc == i), i]
-              n.loads2[which(net$wc == i), i] <- 0
+              # Initialize dominate loadings
+              n.dom <- numeric(ncol(data))
+              n.loads2 <- n.loads
+              
+              for(i in 1:ncol(n.loads))
+              {
+                n.dom[which(net$wc == i)] <- n.loads[which(net$wc == i), i]
+                n.loads2[which(net$wc == i), i] <- 0
+              }
+              
+              # Get dominant and cross-loading proportions
+              n.dom <- mean(n.dom >= 0.15)
+              n.cross <- mean(ifelse(n.loads2 == 0, NA, n.loads2) >= 0.15, na.rm = TRUE)
+              n.cross <- ifelse(is.na(n.cross), 0, n.cross)
+              
+              
+            }else{
+              n.dom <- NA
+              n.cross <- NA
             }
-            
-            # Get dominant and cross-loading proportions
-            n.dom <- mean(n.dom >= 0.15)
-            n.cross <- mean(ifelse(n.loads2 == 0, NA, n.loads2) >= 0.15, na.rm = TRUE)
-            n.cross <- ifelse(is.na(n.cross), 0, n.cross)
             
             nl[count,] <- c(n.low, n.mod, n.high, n.dom, n.cross)
             
             # Get factor loading proportions
             f.loads <- suppressWarnings(abs(as.matrix(psych::fa(cor.mat, nfactors = ncol(n.loads), n.obs = cases)$loadings[,1:ncol(n.loads)])))
+            f.loads <- as.matrix(f.loads[match(names(net$wc), row.names(f.loads)),])
             f.low <- mean(f.loads >= 0.40, na.rm = TRUE)
             f.mod <- mean(f.loads >= 0.55, na.rm = TRUE)
             f.high <- mean(f.loads >= 0.70, na.rm = TRUE)
@@ -168,20 +185,26 @@ LCT <- function (data, n, iter = 100)
             for(i in 1:ncol(data))
             {org[i] <- which.max(f.loads[i,])}
             
-            # Initialize dominate loadings
-            f.dom <- numeric(ncol(data))
-            f.loads2 <- f.loads
-            
-            for(i in 1:max(org))
+            if(ncol(f.loads) != 1)
             {
-              f.dom[which(org == i)] <- f.loads[which(org == i), i]
-              f.loads2[which(org == i), i] <- 0
+              # Initialize dominate loadings
+              f.dom <- numeric(ncol(data))
+              f.loads2 <- f.loads
+              
+              for(i in 1:max(org))
+              {
+                f.dom[which(org == i)] <- f.loads[which(org == i), i]
+                f.loads2[which(org == i), i] <- 0
+              }
+              
+              # Get dominant and cross-loading proportions
+              f.dom <- mean(f.dom >= 0.40)
+              f.cross <- mean(ifelse(f.loads2 == 0, NA, f.loads2) >= 0.40, na.rm = TRUE)
+              f.cross <- ifelse(is.na(f.cross), 0, f.cross)
+            }else{
+              f.dom <- NA
+              f.cross <- NA
             }
-            
-            # Get dominant and cross-loading proportions
-            f.dom <- mean(f.dom >= 0.40)
-            f.cross <- mean(ifelse(f.loads2 == 0, NA, f.loads2) >= 0.40, na.rm = TRUE)
-            f.cross <- ifelse(is.na(f.cross), 0, f.cross)
             
             fl[count,] <- c(f.low, f.mod, f.high, f.dom, f.cross)
             
@@ -222,8 +245,8 @@ LCT <- function (data, n, iter = 100)
                     "1" = "Random",
                     "2" = "Factor",
                     "3" = "Network"
-             )
-                      
+  )
+  
   predictions$empirical <- wo.boot
   
   # Bootstrap prediction
@@ -240,24 +263,27 @@ LCT <- function (data, n, iter = 100)
   # Bootstrap proportions
   boot.prop <- apply(na.omit(loads.mat), 1, dnn.predict)
   
-  boot.prop <- colMeans(prop.table(as.matrix(boot.prop)))
+  boot.prop <- colMeans(proportion.table(as.matrix(boot.prop)))
   
   prop <- vector("numeric", length = 3)
   names(prop) <- c("Random", "Factor", "Network")
   
   prop[1:length(boot.prop)] <- boot.prop
   
-  predictions$proportions <- round(prop, 3)
+  predictions$proportion <- round(prop, 3)
   
   # Omnibus prediction
-  omni.prop <- c(wo.boot, boot, names(prop)[which.max(prop)])
-  omni.table <- table(omni.prop)
+  # item{omnibus}{An omnibus prediction based on a consensus of empirical,
+  # bootstrap, and bootstrap proportions prediction. A consensus corresponds to
+  # any combination of two predictions returning the same prediction}
+  #omni.prop <- c(wo.boot, boot, names(prop)[which.max(prop)])
+  #omni.table <- table(omni.prop)
   
-  if(any(omni.table > 1))
-  {omni.pred <- names(omni.table)[which.max(omni.table)]
-  }else{omni.pred <- "No consensus prediction. Check proportion and bootstrap predictions."}
+  #if(any(omni.table > 1))
+  #{omni.pred <- names(omni.table)[which.max(omni.table)]
+  #}else{omni.pred <- "No consensus prediction. Check proportion and bootstrap predictions."}
   
-  predictions$omnibus <- omni.pred
+  #predictions$omnibus <- omni.pred
   
   return(predictions)
   

@@ -18,7 +18,7 @@
 #' Defaults to \code{.10}
 #'
 #' @param plot.item.rep Should the plot be produced for \code{item.replication}?
-#' If \code{TRUE}, then a plot for the \code{item.replication} output will be produced.#'
+#' If \code{TRUE}, then a plot for the \code{item.replication} output will be produced.
 #' Defaults to \code{TRUE}
 #'
 #' @return Returns a list containing:
@@ -50,33 +50,53 @@
 #' # Load data
 #' wmt <- wmt2[,7:24]
 #'
-#' \dontrun{
-#' # Estimate EGA network
-#' ega.wmt <- EGA(data = wmt, model = "glasso")
+#' \donttest{# Estimate EGA network
+#' ## plot.type = "qqraph" used for CRAN checks
+#' ## plot.type = "GGally" is the default
+#' ega.wmt <- EGA(data = wmt, model = "glasso", plot.type = "qgraph")
 #'
 #' # Estimate dimension stability
-#' boot.wmt <- bootEGA(data = wmt, n = 100, typicalStructure = TRUE,
-#' plot.typicalStructure = TRUE, model = "glasso",
-#' type = "parametric", ncores = 4)
+#' boot.wmt <- bootEGA(data = wmt, iter = 100, typicalStructure = TRUE,
+#' plot.typicalStructure = TRUE, model = "glasso", plot.type = "qgraph",
+#' type = "parametric", ncores = 2)
+#' }
 #' 
 #' # Estimate item stability statistics
-#' itemStability(boot.wmt, orig.wc = ega.wmt$wc)
-#' }
+#' res <- itemStability(boot.wmt, orig.wc = ega.wmt$wc)
+#' 
+#' # Changing plot features (ggplot2)
+#' ## Changing colors (ignore warnings)
+#' ### qgraph Defaults
+#' res$plot.itemStability + 
+#'     ggplot2::scale_color_manual(values = rainbow(max(res$uniq.num)))
+#' 
+#' ### Pastel
+#' res$plot.itemStability + 
+#'     ggplot2::scale_color_brewer(palette = "Pastel1")
+#'     
+#' ## Changing Legend (ignore warnings)
+#' res$plot.itemStability + 
+#'     ggplot2::scale_color_discrete(labels = "Intelligence")
 #'
 #' @references
-#' Danon, L., Diaz-Guilera, A., Duch, J., & Arenas, A. (2005).
-#' Comparing community structure identification.
-#' \emph{Journal of Statistical Mechanics: Theory and Experiment}, \emph{9}, P09008.
-#' <doi:10.1088/1742-5468/2005/09/P09008>
+#' Christensen, A. P., & Golino, H. (2019).
+#' Estimating the stability of the number of factors via Bootstrap Exploratory Graph Analysis: A tutorial.
+#' \emph{PsyArXiv}.
+#' \doi{10.31234/osf.io/9deay}
+#' 
+#' Christensen, A. P., Golino, H., & Silvia, P. J. (2020).
+#' A psychometric network perspective on the validity and validation of personality trait questionnaires.
+#' \emph{European Journal of Personality}.
+#' \doi{10.1002/per.2265}
 #'
 #' @seealso \code{\link[EGAnet]{EGA}} to estimate the number of dimensions of an instrument using EGA and
 #' \code{\link[EGAnet]{CFA}} to verify the fit of the structure suggested by EGA using confirmatory factor analysis.
 #'
-#' @author Hudson F. Golino <hfg9s at virginia.edu> and Alexander P. Christensen <alexpaulchristensen@gmail.com>
+#' @author Hudson Golino <hfg9s at virginia.edu> and Alexander P. Christensen <alexpaulchristensen@gmail.com>
 #'
 #' @export
 #Item Stability function
-#Updated 02.07.2020
+#Updated 15.02.2021
 itemStability <- function(bootega.obj, orig.wc, item.freq = .10, plot.item.rep = TRUE){
   
   # Check for 'bootEGA' object
@@ -93,7 +113,7 @@ itemStability <- function(bootega.obj, orig.wc, item.freq = .10, plot.item.rep =
   wc.mat <- matrix(NA, nrow = length(orig.wc), ncol = n)
   
   for(i in 1:length(bootega.obj$bootGraphs))
-  {wc.mat[,i] <- bootega.obj$boot.wc[[i]]$membership}
+  {wc.mat[,i] <- bootega.obj$boot.wc[[i]]}
   
   # Grab item names
   row.names(wc.mat) <- row.names(net)
@@ -126,7 +146,7 @@ itemStability <- function(bootega.obj, orig.wc, item.freq = .10, plot.item.rep =
   message("Computing results...", appendLF = FALSE)
   
   # Get proportion table
-  item.tab <- prop.table(final.mat)
+  item.tab <- proportion.table(final.mat)
   row.names(item.tab) <- colnames(net)
   
   if(is.character(uni))
@@ -157,16 +177,15 @@ itemStability <- function(bootega.obj, orig.wc, item.freq = .10, plot.item.rep =
   
   #Plot
   comm <- orig.wc
-  rain <- rev(grDevices::rainbow(max(num.comm)))
+  #rain <- rev(RColorBrewer::brewer.pal(max(num.comm), "Set1"))
   
   item.repl <- data.frame(Item = names(itemCon),
                           Replication = itemCon,
-                          Comm = factor(comm, uni[order(uni[max(num.comm):1])]))
+                          Comm = factor(comm, uni[order(uni)]))
   
   
   ic.plot <- ggpubr::ggdotchart(item.repl, x = "Item", y = "Replication",
                                 group = "Comm", color = "Comm",
-                                palette = rain,
                                 legend.title = "EGA Communities",
                                 add = "segments",
                                 rotate = TRUE,
@@ -177,7 +196,17 @@ itemStability <- function(bootega.obj, orig.wc, item.freq = .10, plot.item.rep =
                                 ggtheme = ggpubr::theme_pubr()
   )
   
+  # Adjust y-axis
   ic.plot <- ic.plot + ggplot2::ylim(c(0,1))
+  
+  # Manually change alpha
+  ic.plot$layers[[2]]$aes_params$alpha <- 0.7
+  
+  # Bold legend title
+  ic.plot <- ic.plot + ggplot2::theme(
+    legend.title = ggplot2::element_text(face = "bold"),
+    axis.title = ggplot2::element_text(face = "bold")
+  )
   
   # Adjust item label sizes based on
   sizes <- seq(6,12,.25)
@@ -194,6 +223,25 @@ itemStability <- function(bootega.obj, orig.wc, item.freq = .10, plot.item.rep =
   
   ic.plot <- ic.plot + ggplot2::theme(axis.text.y = ggplot2::element_text(size=text.size))
   
+  # Change color.palette (if necessary)
+  if(!ggplot2::is.ggplot(bootega.obj$plot.typical.ega)){
+    ic.plot <- suppressMessages(
+      ic.plot + ggplot2::scale_color_manual(values = color_palette_EGA("rainbow", orig.wc),
+                                            breaks = sort(orig.wc))
+    )
+  }else{
+    if(bootega.obj$color.palette != "Set1"){
+      ic.plot <- suppressMessages(
+        ic.plot + ggplot2::scale_color_manual(values = color_palette_EGA(bootega.obj$color.palette, orig.wc),
+                                              breaks = sort(orig.wc))
+      )
+    }
+  }
+  
+  # Reverse ordering
+  ic.plot <- ic.plot + ggplot2::scale_x_discrete(limits = rev(ic.plot$data$Item))
+  
+  
   if(plot.item.rep)
   {result$plot.itemStability <- ic.plot}
   
@@ -202,6 +250,11 @@ itemStability <- function(bootega.obj, orig.wc, item.freq = .10, plot.item.rep =
   
   #match row names to itemCon output
   itemLik <- as.data.frame(item.tab[match(names(itemCon),row.names(item.tab)),])
+  
+  #catch unidimensional structures (ugly band-aid fix)
+  if(length(colnames(itemLik)) == 1){
+    colnames(itemLik) <- 1
+  }
   
   ##########################################################
   #### ITEM FREQUENCY AND DIMENSION REPLICATION RESULTS ####
@@ -248,7 +301,11 @@ itemStability <- function(bootega.obj, orig.wc, item.freq = .10, plot.item.rep =
   #Unstandardized
   arr.func <- function(data)
   {
-    arr <- array(NA, dim = c(nrow(data[[1]]), ncol(data[[1]]), length(data)))
+    # Get maximum dimensions
+    r.dims <- max(sapply(data, dim)[1,])
+    n.dims <- max(sapply(data, dim)[2,])
+    
+    arr <- array(NA, dim = c(r.dims, n.dims, length(data)))
     
     for(i in 1:length(data))
     {
@@ -257,6 +314,14 @@ itemStability <- function(bootega.obj, orig.wc, item.freq = .10, plot.item.rep =
       
       # Reorder based on bootega network
       target.mat <- target.mat[match(colnames(bootega.obj$EGA$network), row.names(target.mat)),]
+      
+      # Check for NAs
+      if(any(is.na(target.mat))){
+        NAs <- which(is.na(target.mat))
+        
+        names(target.mat)[NAs] <- colnames(bootega.obj$EGA$network)[NAs]
+        
+      }
       
       # Insert into array
       arr[,,i] <- target.mat
@@ -276,9 +341,12 @@ itemStability <- function(bootega.obj, orig.wc, item.freq = .10, plot.item.rep =
   #let user know results are computed has ended
   message("done", appendLF = TRUE)
   
-  unstd.item.id <- unstd.item.id[row.names(item.lik),]
-  
-  unstd.item.id <- unstd.item.id[,colnames(item.lik)]
+  if(ncol(unstd.item.id) > 1){
+    
+    unstd.item.id <- unstd.item.id[row.names(item.lik),]
+    
+    unstd.item.id <- unstd.item.id[,colnames(item.lik)]
+  }
   
   unstd.item.id[which(item.lik=="")] <- ""
   
