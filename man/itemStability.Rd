@@ -4,47 +4,61 @@
 \alias{itemStability}
 \title{Item Stability Statistics from \code{\link[EGAnet]{bootEGA}}}
 \usage{
-itemStability(bootega.obj, orig.wc, item.freq = 0.1, plot.item.rep = TRUE)
+itemStability(bootega.obj, IS.plot = TRUE, ...)
 }
 \arguments{
 \item{bootega.obj}{A \code{\link[EGAnet]{bootEGA}} object}
 
-\item{orig.wc}{Numeric or character.
-A vector with community numbers or labels for each item.
-Typically uses community results (\code{wc}) from \code{\link[EGAnet]{EGA}}}
-
-\item{item.freq}{A value for lowest frequency allowed in \code{item.dim.rep} output.
-Removes noise from table to allow for easier interpretation.
-Defaults to \code{.10}}
-
-\item{plot.item.rep}{Should the plot be produced for \code{item.replication}?
+\item{IS.plot}{Should the plot be produced for \code{item.replication}?
 If \code{TRUE}, then a plot for the \code{item.replication} output will be produced.
 Defaults to \code{TRUE}}
+
+\item{...}{Additional arguments.
+Used for deprecated arguments from previous versions of \code{\link[EGAnet]{itemStability}}}
 }
 \value{
 Returns a list containing:
 
-\item{item.replication}{The proportion of times each item replicated
-within the defined dimension}
+\item{membership}{A list containing:
 
-\item{mean.dim.rep}{The average replication proportion of items replicating
-in each dimension. More simply, the average of the \code{item.replication}
-output for each dimension}
+\itemize{
 
-\item{item.dim.rep}{The proportion of times each item replicated
-within each possible dimension. Dimensions greater than the maximum
-number used in the \code{orig.wc} argument are labeled based on the
-largest remaining components after the dimensions used to \code{orig.wc}}
+\item{\strong{\code{empirical}}}
+{The empirical memberships from the empirical \code{\link[EGAnet]{EGA}} result}
 
-\item{item.loadings}{Matrix of the average standardized network loading
+\item{\strong{\code{unique}}}
+{The unique dimensions from the empirical \code{\link[EGAnet]{EGA}} result}
+
+\item{\strong{\code{bootstrap}}}
+{The memberships from the replicate samples in the \code{\link[EGAnet]{bootEGA}} results}
+   }
+}
+
+\item{item.stability}{A list containing:
+
+\itemize{
+
+\item{\strong{\code{empirical.dimensions}}}
+{The proportion of times each item replicated
+within the empirical \code{\link[EGAnet]{EGA}} defined dimension.
+This EGA result is defined using the input from
+\code{\link[EGAnet]{bootEGA}}}
+
+\item{\strong{\code{all.dimensions}}}
+{The proportion of times each item replicated
+in each of the empirical \code{\link[EGAnet]{EGA}} defined dimensions.
+This EGA result is defined using the input from
+\code{\link[EGAnet]{bootEGA}}}
+
+
+   }
+}
+
+\item{plot}{A plot of the number of times each item
+replicated within the empirical \code{\link[EGAnet]{EGA}} defined dimension.}
+
+\item{mean.loadings}{Matrix of the average standardized network loading
 (computed using \code{\link[EGAnet]{net.loads}}) for each item in each dimension}
-
-\item{wc}{A matrix containing the community membership values for
-each bootstrapped sample. The values correspond to the values input
-for the \code{orig.wc} argument}
-
-\item{plot.itemStability}{A plot of the number of times each item
-replicates in its original community membership (\code{orig.wc})}
 }
 \description{
 Based on the \code{\link[EGAnet]{bootEGA}} results, this function
@@ -59,7 +73,7 @@ network loading for each item in each dimension (\code{item.loadings}).
 # Load data
 wmt <- wmt2[,7:24]
 
-\donttest{# Estimate EGA network
+\dontrun{# Estimate EGA network
 ## plot.type = "qqraph" used for CRAN checks
 ## plot.type = "GGally" is the default
 ega.wmt <- EGA(data = wmt, model = "glasso", plot.type = "qgraph")
@@ -71,33 +85,31 @@ type = "parametric", ncores = 2)
 }
 
 # Estimate item stability statistics
-res <- itemStability(boot.wmt, orig.wc = ega.wmt$wc)
+res <- itemStability(boot.wmt)
 
 # Changing plot features (ggplot2)
 ## Changing colors (ignore warnings)
 ### qgraph Defaults
-res$plot.itemStability + 
-    ggplot2::scale_color_manual(values = rainbow(max(res$uniq.num)))
+res$plot + 
+    ggplot2::scale_color_manual(values = rainbow(max(res$membership$unique)))
 
 ### Pastel
-res$plot.itemStability + 
+res$plot + 
     ggplot2::scale_color_brewer(palette = "Pastel1")
     
 ## Changing Legend (ignore warnings)
-res$plot.itemStability + 
+res$plot + 
     ggplot2::scale_color_discrete(labels = "Intelligence")
 
 }
 \references{
-Christensen, A. P., & Golino, H. (2019).
+Christensen, A. P., & Golino, H. (2021).
 Estimating the stability of the number of factors via Bootstrap Exploratory Graph Analysis: A tutorial.
-\emph{PsyArXiv}.
-\doi{10.31234/osf.io/9deay}
+\emph{Psych}, \emph{3}(3), 479-500.
 
 Christensen, A. P., Golino, H., & Silvia, P. J. (2020).
 A psychometric network perspective on the validity and validation of personality trait questionnaires.
-\emph{European Journal of Personality}.
-\doi{10.1002/per.2265}
+\emph{European Journal of Personality}, \emph{34}(6), 1095-1108.
 }
 \seealso{
 \code{\link[EGAnet]{EGA}} to estimate the number of dimensions of an instrument using EGA and

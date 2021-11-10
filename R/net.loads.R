@@ -77,54 +77,24 @@
 #' @references
 #' Christensen, A. P., & Golino, H. (2021).
 #' On the equivalency of factor and network loadings.
-#' \emph{Behavior Research Methods}.
-#' \doi{10.3758/s13428-020-01500-6}
+#' \emph{Behavior Research Methods}, \emph{53}, 1563-1580.
 #' 
-#' Christensen, A. P., Golino, H., & Silvia, P. J. (in press).
+#' Christensen, A. P., Golino, H., & Silvia, P. J. (2020).
 #' A psychometric network perspective on the validity and validation of personality trait questionnaires.
-#' \emph{European Journal of Personality}.
-#' \doi{10.1002/per.2265}
+#' \emph{European Journal of Personality}, \emph{34}, 1095-1108.
 #'
 #' Hallquist, M., Wright, A. C. G., & Molenaar, P. C. M. (2019).
 #' Problems with centrality measures in psychopathology symptom networks: Why network psychometrics cannot escape psychometric theory.
 #' \emph{Multivariate Behavioral Research}, 1-25.
-#' \doi{10.1080/00273171.2019.1640103}
 #'
 #' @author Alexander P. Christensen <alexpaulchristensen@gmail.com> and Hudson Golino <hfg9s at virginia.edu>
 #'
 #' @export
 #'
 # Network Loadings
-# Updated 14.12.2020
+# Updated 02.07.2021
 net.loads <- function(A, wc, pos.manifold = FALSE, min.load = 0, plot.NL = FALSE)
 {
-  
-  # Function to order loadings largest to smallest
-  # within their respective factors
-  descend.ord <- function(loads, wc){
-    # Initialize ordering vector
-    ord.names <- vector("character")
-    
-    # Loop through dimensions
-    for(i in colnames(loads)){
-      ord <- order(loads[names(which(wc == i)),i], decreasing = TRUE)
-      ord.names <- c(ord.names, names(which(wc == i))[ord])
-    }
-    
-    # Reorder
-    reord <- loads[ord.names,]
-    
-    # Check for matrix
-    if(!is.matrix(reord)){
-      reord <- as.matrix(reord)
-    }
-    
-    # Make sure names
-    row.names(reord) <- ord.names
-    colnames(reord) <- colnames(loads)
-    
-    return(reord)
-  }
   
   #------------------------------------------#
   ## DETECT EGA INPUT AND VARIABLE ORDERING ##
@@ -133,7 +103,7 @@ net.loads <- function(A, wc, pos.manifold = FALSE, min.load = 0, plot.NL = FALSE
   if(any(class(A) == "EGA"))
   {
     # Order
-    ord <- match(A$dim.variables$items, names(A$wc))
+    ord <- match(colnames(A$network), names(A$wc))
     
     # Grab communities
     wc <- A$wc

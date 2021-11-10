@@ -1,3 +1,40 @@
+Changes in version 1.0.0
+
+o FIX: Bug within the bootEGA function for `type = "resampling"`.
+
+o **UPDATE**: default undimensionality adjustment has changed to leading eigenvalue (see Christensen, Garrido, & Golino, 2021 <https://doi.org/10.31234/osf.io/hz89e>). Previous unidimensionality adjustment in versions <= 0.9.8 can be applied using `uni.method = "expand"`
+
+O **UPDATE**: default `UVA` was changed `type = "threshold"`
+
+o UPDATE: `UVA` is now automated using `auto = TRUE`
+
+o DEFUNCT: `dimStability` will no longer be supported. Instead, use `dimensionStability`
+
+o REVAMP: `itemStability` has been recoded. Now includes error checking and more readable code
+
+o FIX: bug for plotting NA communities
+
+o FIX: bug for changing edge size in 'GGally' plotting
+
+o UPDATE: S3Methods for `EGA.fit` plotting
+
+o FIX: plotting parameters for `bootEGA`
+
+o FIX: redundancy output for adhoc check in `UVA`
+
+o FIX: latent variable with non-space separated entries in `UVA` (`reduce.method = "latent"`)
+
+o UPDATE: `UVA` was added to `methods.section`
+
+o UPDATE: neural network weights in `LCT` (now only tests for factor or small-world network models)
+
+o UPDATE: citations
+
+o UPDATE: added `seed` argument for `bootEGA` to reproduce results
+
+o FIX: bug for Rand index in `itemStability`
+
+
 Changes in version 0.9.8
 
 o UPDATE: Unidimensional check in `EGA` expands a correlation matrix (rather than generating variables; much more efficient)
@@ -31,6 +68,7 @@ o ADD: total correlation (see `?totalCor` and `totalCorMat`)
 o ADD: correlation argument (corr) for `EGA`, `bootEGA`, and `UVA`
 
 o FIX: *GGally* color palette when more than 9 dimensions
+
 
 Changes in version 0.9.7
 

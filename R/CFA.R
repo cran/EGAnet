@@ -41,12 +41,12 @@
 #' cor.wmt <- cor(wmt)
 #' 
 #' # Estimate EGA
-#' ega.wmt <- EGA(data = wmt, uni = TRUE, n = nrow(wmt2), plot.EGA = FALSE)
+#' ega.wmt <- EGA(data = wmt, n = nrow(wmt2), plot.EGA = FALSE)
 #' }
 #'
 #' \donttest{
 #' # Estimate EGA
-#' ega.wmt <- EGA(data = wmt, uni = TRUE, plot.EGA = FALSE)
+#' ega.wmt <- EGA(data = wmt, plot.EGA = FALSE)
 #' 
 #' # Fit CFA model to EGA results
 #' cfa.wmt <- CFA(ega.obj = ega.wmt, estimator = 'WLSMV', plot.CFA = TRUE, data = wmt)
@@ -71,12 +71,10 @@
 #' Christensen, A. P., Gross, G. M., Golino, H., Silvia, P. J., & Kwapil, T. R. (2019).
 #' Exploratory graph analysis of the Multidimensional Schizotypy Scale.
 #' \emph{Schizophrenia Research}, \emph{206}, 43-51.
-#' \doi{10.1016/j.schres.2018.12.018}
 #' 
 #' Golino, H., & Epskamp, S. (2017).
 #' Exploratory graph analysis: A new approach for estimating the number of dimensions in psychological research.
 #' \emph{PLoS ONE}, \emph{12}, e0174035.
-#' \doi{10.1371/journal.pone.0174035}
 #'
 #' @seealso \code{\link[EGAnet]{EGA}} to estimate the number of dimensions of an instrument using EGA and
 #' \code{\link[EGAnet]{bootEGA}} to investigate the stability of EGA's estimation via bootstrap.

@@ -6,9 +6,11 @@
 \usage{
 bootEGA(
   data,
-  uni = TRUE,
+  n = NULL,
+  uni.method = c("expand", "LE"),
   iter,
   type = c("parametric", "resampling"),
+  seed = 1234,
   corr = c("cor_auto", "pearson", "spearman"),
   model = c("glasso", "TMFG"),
   model.args = list(),
@@ -26,17 +28,31 @@ bootEGA(
 \item{data}{Matrix or data frame.
 Includes the variables to be used in the \code{bootEGA} analysis}
 
-\item{uni}{Boolean.
-Should unidimensionality be checked?
-Defaults to \code{TRUE}.
-Set to \code{FALSE} to check for multidimensionality only.
-If \code{TRUE}, then the same number of variables as the original
-data (i.e., from argument \code{data}) are generated from a factor
-model with one factor and loadings of .70. These data are then
-appended to the original data and dimensionality is checked.
-If the number of dimensions is one or two, then the original
-data are unidimensional; otherwise, the data are multidimensional
-(see Golino, Shi, et al., 2020 for more details)}
+\item{n}{Integer.
+Sample size if \code{data} provided is a correlation matrix}
+
+\item{uni.method}{Character.
+What unidimensionality method should be used?
+Defaults to \code{"LE"}.
+Current options are:
+
+\itemize{
+
+\item{\strong{\code{expand}}}
+{Expands the correlation matrix with four variables correlated .50.
+If number of dimension returns 2 or less in check, then the data
+are unidimensional; otherwise, regular EGA with no matrix
+expansion is used. This is the method used in the Golino et al. (2020)
+\emph{Psychological Methods} simulation.}
+
+\item{\strong{\code{LE}}}
+{Applies the leading eigenvalue algorithm (\code{\link[igraph]{cluster_leading_eigen}})
+on the empirical correlation matrix. If the number of dimensions is 1,
+then the leading eigenvalue solution is used; otherwise, regular EGA
+is used. This is the final method used in the Christensen, Garrido,
+and Golino (2021) simulation.}
+
+}}
 
 \item{iter}{Numeric integer.
 Number of replica samples to generate from the bootstrap analysis.
@@ -57,6 +73,9 @@ original dataset, via the \code{\link[MASS]{mvrnorm}} function}
 {Generates n random subsamples of the original data}
 
 }}
+
+\item{seed}{Numeric.
+Seed to reproduce results. Defaults to \code{1234}. For random results, set to \code{NULL}}
 
 \item{corr}{Type of correlation matrix to compute. The default uses \code{\link[qgraph]{cor_auto}}.
 Current options are:
@@ -164,7 +183,7 @@ full list of arguments):
 \item{\strong{\code{color.palette}}}
 {The color palette for the nodes. For custom colors,
 enter HEX codes for each dimension in a vector.
-See \code{\link[EGAnet]{color_palette_EGA}} for 
+See \code{\link[EGAnet]{color_palette_EGA}} for
 more details and examples}
 
 }}
@@ -234,38 +253,28 @@ type = "parametric", ncores = 2)
 
 # bootEGA TMFG example
 boot.wmt <- bootEGA(data = wmt, iter = 500, model = "TMFG",
-plot.type = "qgraph", type = "parametric", ncores = 2)
+plot.type = "qgraph", type = "parametric", ncores = 2, seed = 1234)
 
 # bootEGA Louvain example
 boot.wmt <- bootEGA(data = wmt, iter = 500, algorithm = "louvain",
-plot.type = "qgraph", type = "parametric", ncores = 2)
+plot.type = "qgraph", type = "parametric", ncores = 2, seed = 1234)
 
 # bootEGA Spinglass example
 boot.wmt <- bootEGA(data = wmt, iter = 500, model = "TMFG", plot.type = "qgraph",
 algorithm = igraph::cluster_spinglass, type = "parametric", ncores = 2)
 }
 
-# Load data
-intwl <- intelligenceBattery[,8:66]
-
-\donttest{# Another bootEGA example
-boot.intwl <- bootEGA(data = intwl, iter = 500,
-plot.type = "qgraph", type = "parametric", ncores = 2)
-}
-
 }
 \references{
 # Original implementation of bootEGA \cr
-Christensen, A. P., & Golino, H. (2019).
+Christensen, A. P., & Golino, H. (2021).
 Estimating the stability of the number of factors via Bootstrap Exploratory Graph Analysis: A tutorial.
-\emph{PsyArXiv}.
-\doi{10.31234/osf.io/9deay}
+\emph{Psych}, \emph{3}(3), 479-500.
 
-# Structural consistency (see \code{\link[EGAnet]{dimStability}}) \cr
-Christensen, A. P., Golino, H., & Silvia, P. J. (in press).
+# Structural consistency (see \code{\link[EGAnet]{dimensionStability}}) \cr
+Christensen, A. P., Golino, H., & Silvia, P. J. (2020).
 A psychometric network perspective on the validity and validation of personality trait questionnaires.
-\emph{European Journal of Personality}.
-\doi{10.1002/per.2265}
+\emph{European Journal of Personality}, \emph{34}(6), 1095-1108.
 }
 \seealso{
 \code{\link[EGAnet]{EGA}} to estimate the number of dimensions of an instrument using EGA

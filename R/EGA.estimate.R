@@ -134,35 +134,30 @@
 #' Christensen, A. P., & Golino, H. (under review).
 #' Estimating factors with psychometric networks: A Monte Carlo simulation comparing community detection algorithms.
 #' \emph{PsyArXiv}.
-#' \doi{10.31234/osf.io/hz89e}
 #'
 #' # Original simulation and implementation of EGA \cr
 #' Golino, H. F., & Epskamp, S. (2017).
 #' Exploratory graph analysis: A new approach for estimating the number of dimensions in psychological research.
-#' \emph{PLoS ONE}, \emph{12}, e0174035..
-#' \doi{10.1371/journal.pone.0174035}
+#' \emph{PLoS ONE}, \emph{12}, e0174035.
 #'
 #' Golino, H. F., & Demetriou, A. (2017).
 #' Estimating the dimensionality of intelligence like data using Exploratory Graph Analysis.
 #' \emph{Intelligence}, \emph{62}, 54-70.
-#' \doi{10.1016/j.intell.2017.02.007}
 #'
 #' # Current implementation of EGA, introduced unidimensional checks, continuous and dichotomous data \cr
 #' Golino, H., Shi, D., Christensen, A. P., Garrido, L. E., Nieto, M. D., Sadana, R., & Thiyagarajan, J. A. (2020).
 #' Investigating the performance of Exploratory Graph Analysis and traditional techniques to identify the number of latent factors: A simulation and tutorial.
 #' \emph{Psychological Methods}, \emph{25}, 292-320.
-#' \doi{10.1037/met0000255}
 #'
 #' # Walktrap algorithm \cr
 #' Pons, P., & Latapy, M. (2006).
 #' Computing communities in large networks using random walks.
 #' \emph{Journal of Graph Algorithms and Applications}, \emph{10}, 191-218.
-#' \doi{10.7155/jgaa.00185}
 #'
 #' @export
 #'
 # Estimates EGA
-# Updated 03.12.2020
+# Updated 16.06.2021
 EGA.estimate <- function(data, n = NULL,
                          model = c("glasso", "TMFG"), model.args = list(),
                          algorithm = c("walktrap", "louvain"), algorithm.args = list(),
@@ -170,7 +165,9 @@ EGA.estimate <- function(data, n = NULL,
                          verbose = TRUE,
                          ...)
 {
-
+  # Make the data a matrix
+  data <- as.matrix(data)
+  
   # Get additional arguments
   add.args <- list(...)
 
@@ -275,7 +272,6 @@ EGA.estimate <- function(data, n = NULL,
     n <- nrow(data)
 
     # Compute correlation matrix
-
     cor.data <- switch(corr,
                        cor_auto = qgraph::cor_auto(data, forcePD = TRUE),
                        pearson = cor(data, use = "pairwise.complete.obs", method = "pearson"),
@@ -294,16 +290,44 @@ EGA.estimate <- function(data, n = NULL,
 
   }else{
 
-    # Check if positive definite
-    if(any(eigen(data)$values < 0)){
-
-      # Let user know
-      warning("Correlation matrix is not positive definite.\nForcing positive definite matrix using Matrix::nearPD()\nResults may be unreliable")
-
-      # Force positive definite matrix
-      cor.data <- as.matrix(Matrix::nearPD(data, corr = TRUE, keepDiag = TRUE, ensureSymmetry = TRUE)$mat)
-
-    }else{cor.data <- data}
+    # Check if symmetric (time series data)
+    if(!isSymmetric(data)){
+      
+      # Obtain n
+      n <- nrow(data)
+      
+      # Compute correlation matrix
+      cor.data <- switch(corr,
+                         cor_auto = qgraph::cor_auto(data, forcePD = TRUE),
+                         pearson = cor(data, use = "pairwise.complete.obs", method = "pearson"),
+                         spearman = cor(data, use = "pairwise.complete.obs", method = "spearman")
+      )
+      
+      # Check if positive definite
+      if(any(eigen(cor.data)$values < 0)){
+        
+        # Let user know
+        warning("Correlation matrix is not positive definite.\nForcing positive definite matrix using Matrix::nearPD()\nResults may be unreliable")
+        
+        # Force positive definite matrix
+        cor.data <- as.matrix(Matrix::nearPD(cor.data, corr = TRUE, keepDiag = TRUE, ensureSymmetry = TRUE)$mat)
+        
+      }
+    }else{
+      
+      # Check if positive definite
+      if(any(eigen(data)$values < 0)){
+        
+        # Let user know
+        warning("Correlation matrix is not positive definite.\nForcing positive definite matrix using Matrix::nearPD()\nResults may be unreliable")
+        
+        # Force positive definite matrix
+        cor.data <- as.matrix(Matrix::nearPD(data, corr = TRUE, keepDiag = TRUE, ensureSymmetry = TRUE)$mat)
+        
+      }else{cor.data <- data}
+      
+    }
+    
   }
 
   #### ADDITIONAL ARGUMENTS HANDLING ####
@@ -403,9 +427,35 @@ EGA.estimate <- function(data, n = NULL,
   if(exists("unconnected")){
     wc[unconnected] <- NA
   }
+  
+  # Convert numbers to be consecutive
+  uniq.wc <- unique(na.omit(wc))
+  wc.ord <- sort(uniq.wc)
+  proper.ord <- 1:length(uniq.wc)
+
+  # Check changes needed for consecutive ordering
+  if(any(wc.ord != proper.ord)){
+
+    # Initialize new wc
+    new.wc <- numeric(length = length(wc))
+
+    # Target wcs to change
+    targets <- which(wc.ord != proper.ord)
+
+    if(length(targets) != 0){
+
+      for(i in targets){
+        new.wc[which(wc == wc.ord[i])] <- proper.ord[i]
+      }
+
+      wc <- ifelse(new.wc == 0, wc, new.wc)
+
+    }
+
+  }
 
   names(wc) <- colnames(data)
-  n.dim <- suppressWarnings(max(wc, na.rm = TRUE))
+  n.dim <- suppressWarnings(length(unique(na.omit(wc))))
 
   # Return results
   res <- list()
@@ -421,3 +471,4 @@ EGA.estimate <- function(data, n = NULL,
 
   return(res)
 }
+

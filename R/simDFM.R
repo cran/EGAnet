@@ -53,20 +53,19 @@
 #'}
 #'
 #' @references
-#'
+#' Engle, R., & Watson, M. (1981).
 #' A one-factor multivariate time series model of metropolitan wage rates.
-#' \emph{Journal of the American Statistical Association}, \emph{76(376)}, 774-781.
-#' ref:\href{https://amstat.tandfonline.com/doi/abs/10.1080/01621459.1981.10477720#.XmkWWy2ZMuA}{01621459.1981.10477720#.XmkWWy2ZMuA}
-#'
+#' \emph{Journal of the American Statistical Association}, \emph{76}(376), 774-781.
+#' 
 #' Nesselroade, J. R., McArdle, J. J., Aggen, S. H., & Meyers, J. M. (2002).
 #' Dynamic factor analysis models for representing process in multivariate time-series. In D. S. Moskowitz & S. L. Hershberger (Eds.),
-#' \emph{Multivariate applications book series. Modeling intraindividual variability with repeated measures data: Methods and applications}, 235–265.
-#' \href{https://psycnet.apa.org/record/2001-05300-009}{https://psycnet.apa.org/record/2001-05300-009}
-#'
+#' \emph{Multivariate applications book series. Modeling intraindividual variability with repeated measures data: Methods and applications}, 235-265.
+#' 
 #' @author Hudson F. Golino <hfg9s at virginia.edu>
 #'
 #' @export
-#Dimension Stability function
+# Simulate dynamic factor model
+# Updated 26.05.2021
 simDFM <- function(variab, timep, nfact, error, dfm = c("DAFS","RandomWalk"),
                    loadings, autoreg, crossreg, var.shock, cov.shock, burnin = 1000){
 
@@ -77,7 +76,7 @@ simDFM <- function(variab, timep, nfact, error, dfm = c("DAFS","RandomWalk"),
 
   # Factor Scores:
 
-  if(dfm == "VAR1"){
+  if(dfm == "DAFS"){
     # B = Matrix of Bl is a nfact x nfact matrix containing the autoregressive and cross-regressive coefficients
     B <- matrix(autoreg, ncol = nfact, nrow = nfact)
     diag(B) <- crossreg

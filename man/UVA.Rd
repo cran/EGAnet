@@ -9,11 +9,13 @@ UVA(
   n = NULL,
   model = c("glasso", "TMFG"),
   corr = c("cor_auto", "pearson", "spearman"),
-  method = c("cor", "pcor", "wTO"),
+  method = c("cor", "pcor", "wTO", "IRT"),
   type = c("adapt", "alpha", "threshold"),
   sig,
   key = NULL,
   reduce = TRUE,
+  auto = TRUE,
+  label_latent = TRUE,
   reduce.method = c("latent", "remove", "sum"),
   lavaan.args = list(),
   adhoc = TRUE,
@@ -66,14 +68,15 @@ the \code{\link[stats]{cor}}} function.
 
 \item{method}{Character.
 Computes weighted topological overlap (\code{"wTO"} using \code{\link[qgraph]{EBICglasso}}),
-partial correlations (\code{"pcor"}), and correlations (\code{"cor"}).
+partial correlations (\code{"pcor"}), correlations (\code{"cor"}) or the correlated residuals
+from a unidimensional item response theory model (\code{"IRT"}) using \code{\link[mirt]{mirt}}.
 Defaults to \code{"wTO"}}
 
 \item{type}{Character. Type of significance.
 Computes significance using the standard \emph{p}-value (\code{"alpha"}),
 adaptive alpha \emph{p}-value (\code{\link[NetworkToolbox]{adapt.a}}), 
 or some threshold \code{"threshold"}.
-Defaults to \code{"adapt"}}
+Defaults to \code{"threshold"}}
 
 \item{sig}{Numeric.
 \emph{p}-value for significance of overlap (defaults to \code{.05}).
@@ -82,13 +85,16 @@ Defaults for \code{"threshold"} for each \code{method}:
 \itemize{
 
 \item{\code{"wTO"}}
-{.20}
+{.25}
 
 \item{\code{"pcor"}}
-{.20}
+{.35}
 
 \item{\code{"cor"}}
-{.70}
+{.50}
+
+\item{\code{"IRT"}}
+{.35}
 
 }}
 
@@ -101,6 +107,16 @@ Defaults to \code{NULL} or the column names of \code{data}}
 Should redundancy reduction be performed?
 Defaults to \code{TRUE}.
 Set to \code{FALSE} for redundancy analysis only}
+
+\item{auto}{Boolean.
+Should redundancy reduction be automated?
+Defaults to \code{TRUE}.
+Set to \code{FALSE} for manual selection}
+
+\item{label_latent}{Boolean.
+Should latent variables be labelled?
+Defaults to \code{TRUE}.
+Set to \code{FALSE} for arbitrary labelling (i.e., "LV_")}
 
 \item{reduce.method}{Character.
 How should data be reduced?
@@ -166,13 +182,13 @@ Defaults:
 
 \itemize{
 
-\item{\code{vsize = 6}}{}
+\item{\code{vsize = 6}}{Changes node size}
 
-\item{\code{alpha = 0.4}}{}
+\item{\code{alpha = 0.4}}{Changes transparency}
 
-\item{\code{label.size = 5}}{}
+\item{\code{label.size = 5}}{Changes label size}
 
-\item{\code{edge.alpha = 0.7}}{}
+\item{\code{edge.alpha = 0.7}}{Changes edge transparency}
 
 }}
 }
@@ -273,36 +289,37 @@ items <- psychTools::spi[,idx]
 key.ind <- match(colnames(items), as.character(psychTools::spi.dictionary$item_id))
 key <- as.character(psychTools::spi.dictionary$item[key.ind])
 
+# Automated selection of redundant variables (default)
+\donttest{
+uva.results <- UVA(data = items, key = key)
+}
+
+# Manual selection of redundant variables
 if(interactive()){
-UVA(data = items, method = "wTO", type = "adapt",
-    key = key, reduce.method = "latent")
+uva.results <- UVA(data = items, key = key, type = "adapt")
 }
 
 }
 \references{
-# Simulation using \code{UCA} \cr
-Christensen, A. P., Garrido, L. E., & Golino, H. (2020).
+# Simulation using \code{UVA} \cr
+Christensen, A. P., Garrido, L. E., & Golino, H. (under review).
 Unique Variable Analysis: A novel approach for detecting redundant variables in multivariate data.
 \emph{PsyArXiv}.
-\doi{10.31234/osf.io/4kra2}
 
-# Implementation of \code{UCA} (formally \code{node.redundant}) \cr
+# Implementation of \code{UVA} (formally \code{node.redundant}) \cr
 Christensen, A. P., Golino, H., & Silvia, P. J. (2020).
 A psychometric network perspective on the validity and validation of personality trait questionnaires.
 \emph{European Journal of Personality}, \emph{34}, 1095-1108.
-\doi{10.1002/per.2265}
 
 # wTO measure \cr
 Nowick, K., Gernat, T., Almaas, E., & Stubbs, L. (2009).
 Differences in human and chimpanzee gene expression patterns define an evolving network of transcription factors in brain.
 \emph{Proceedings of the National Academy of Sciences}, \emph{106}, 22358-22363.
-\doi{10.1073/pnas.0911376106}
 
 # Selection of CFA Estimator \cr
 Rhemtulla, M., Brosseau-Liard, P. E., & Savalei, V. (2012).
 When can categorical variables be treated as continuous? A comparison of robust continuous and categorical SEM estimation methods under suboptimal conditions.
 \emph{Psychological Methods}, \emph{17}, 354-373.
-\doi{10.1037/a0029315}
 }
 \author{
 Alexander Christensen <alexpaulchristensen@gmail.com>

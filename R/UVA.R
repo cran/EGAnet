@@ -48,14 +48,15 @@
 #' 
 #' @param method Character.
 #' Computes weighted topological overlap (\code{"wTO"} using \code{\link[qgraph]{EBICglasso}}),
-#' partial correlations (\code{"pcor"}), and correlations (\code{"cor"}).
+#' partial correlations (\code{"pcor"}), correlations (\code{"cor"}) or the correlated residuals
+#' from a unidimensional item response theory model (\code{"IRT"}) using \code{\link[mirt]{mirt}}.
 #' Defaults to \code{"wTO"}
 #' 
 #' @param type Character. Type of significance.
 #' Computes significance using the standard \emph{p}-value (\code{"alpha"}),
 #' adaptive alpha \emph{p}-value (\code{\link[NetworkToolbox]{adapt.a}}), 
 #' or some threshold \code{"threshold"}.
-#' Defaults to \code{"adapt"} 
+#' Defaults to \code{"threshold"} 
 #'
 #' @param sig Numeric.
 #' \emph{p}-value for significance of overlap (defaults to \code{.05}).
@@ -64,13 +65,16 @@
 #' \itemize{
 #' 
 #' \item{\code{"wTO"}}
-#' {.20}
+#' {.25}
 #' 
 #' \item{\code{"pcor"}}
-#' {.20}
+#' {.35}
 #' 
 #' \item{\code{"cor"}}
-#' {.70}
+#' {.50}
+#' 
+#' \item{\code{"IRT"}}
+#' {.35}
 #' 
 #' } 
 #' 
@@ -83,6 +87,16 @@
 #' Should redundancy reduction be performed?
 #' Defaults to \code{TRUE}.
 #' Set to \code{FALSE} for redundancy analysis only
+#' 
+#' @param auto Boolean.
+#' Should redundancy reduction be automated?
+#' Defaults to \code{TRUE}.
+#' Set to \code{FALSE} for manual selection
+#' 
+#' @param label_latent Boolean.
+#' Should latent variables be labelled?
+#' Defaults to \code{TRUE}.
+#' Set to \code{FALSE} for arbitrary labelling (i.e., "LV_")
 #' 
 #' @param reduce.method Character.
 #' How should data be reduced?
@@ -148,13 +162,13 @@
 #' 
 #' \itemize{
 #' 
-#' \item{\code{vsize = 6}}{}
+#' \item{\code{vsize = 6}}{Changes node size}
 #' 
-#' \item{\code{alpha = 0.4}}{}
+#' \item{\code{alpha = 0.4}}{Changes transparency}
 #' 
-#' \item{\code{label.size = 5}}{}
+#' \item{\code{label.size = 5}}{Changes label size}
 #' 
-#' \item{\code{edge.alpha = 0.7}}{}
+#' \item{\code{edge.alpha = 0.7}}{Changes edge transparency}
 #' 
 #' }
 #'
@@ -249,74 +263,65 @@
 #' key.ind <- match(colnames(items), as.character(psychTools::spi.dictionary$item_id))
 #' key <- as.character(psychTools::spi.dictionary$item[key.ind])
 #' 
+#' # Automated selection of redundant variables (default)
+#' \donttest{
+#' uva.results <- UVA(data = items, key = key)
+#' }
+#' 
+#' # Manual selection of redundant variables
 #' if(interactive()){
-#' UVA(data = items, method = "wTO", type = "adapt",
-#'     key = key, reduce.method = "latent")
+#' uva.results <- UVA(data = items, key = key, type = "adapt")
 #' }
 #'
 #' @references
-#' # Simulation using \code{UCA} \cr
-#' Christensen, A. P., Garrido, L. E., & Golino, H. (2020).
+#' # Simulation using \code{UVA} \cr
+#' Christensen, A. P., Garrido, L. E., & Golino, H. (under review).
 #' Unique Variable Analysis: A novel approach for detecting redundant variables in multivariate data.
 #' \emph{PsyArXiv}.
-#' \doi{10.31234/osf.io/4kra2}
 #' 
-#' # Implementation of \code{UCA} (formally \code{node.redundant}) \cr
+#' # Implementation of \code{UVA} (formally \code{node.redundant}) \cr
 #' Christensen, A. P., Golino, H., & Silvia, P. J. (2020).
 #' A psychometric network perspective on the validity and validation of personality trait questionnaires.
 #' \emph{European Journal of Personality}, \emph{34}, 1095-1108.
-#' \doi{10.1002/per.2265}
 #' 
 #' # wTO measure \cr
 #' Nowick, K., Gernat, T., Almaas, E., & Stubbs, L. (2009).
 #' Differences in human and chimpanzee gene expression patterns define an evolving network of transcription factors in brain.
 #' \emph{Proceedings of the National Academy of Sciences}, \emph{106}, 22358-22363.
-#' \doi{10.1073/pnas.0911376106}
 #' 
 #' # Selection of CFA Estimator \cr
 #' Rhemtulla, M., Brosseau-Liard, P. E., & Savalei, V. (2012).
 #' When can categorical variables be treated as continuous? A comparison of robust continuous and categorical SEM estimation methods under suboptimal conditions.
 #' \emph{Psychological Methods}, \emph{17}, 354-373.
-#' \doi{10.1037/a0029315}
 #'
 #' @author Alexander Christensen <alexpaulchristensen@gmail.com>
 #'
 #' @importFrom stats pgamma pnorm qgamma qnorm cov2cor mad
+#' @importFrom utils capture.output
 #'
 #' @export
 #
 # Unique Variable Analysis
-# Updated 15.02.2021
+# Updated 24.10.2021
 UVA <- function(data, n = NULL,
                 model = c("glasso", "TMFG"),
                 corr = c("cor_auto", "pearson", "spearman"),
-                method = c("cor", "pcor", "wTO"),
+                method = c("cor", "pcor", "wTO", "IRT"),
                 type = c("adapt", "alpha", "threshold"), sig,
-                key = NULL, reduce = TRUE,
+                key = NULL, reduce = TRUE, auto = TRUE, label_latent = TRUE,
                 reduce.method = c("latent", "remove", "sum"),
                 lavaan.args = list(), adhoc = TRUE,
                 plot.redundancy = FALSE, plot.args = list()
                 )
 {
+  # Make sure data is a matrix
+  data <- as.matrix(data)
+  
   # Missing and NULL arguments
-  ## n
-  if(nrow(data) == ncol(data)){
-    if(is.null(n)){
-      stop("Argument 'n' must be set for square matrices")
-    }
-  }else{### Get n
-    n <- nrow(data)
-    ## Compute correlation matrix
-    cormat <- switch(corr,
-                       "cor_auto" = qgraph::cor_auto(data),
-                       "pearson" = cor(data, use = "pairwise.complete.obs"),
-                       "spearman" = cor(data, method = "spearman", use = "pairwise.complete.obs")
-    )
-    ### Make sure it's positive definite
-    if(any(eigen(cormat)$values < 0)){
-      cormat <- as.matrix(Matrix::nearPD(cormat, keepDiag = TRUE)$mat)
-    }
-  }
+  ## corr
+  if(missing(corr)){
+    corr <- "cor_auto"
+  }else{corr <- match.arg(corr)}
   
   ## model
   if(missing(model)){
@@ -330,23 +335,23 @@ UVA <- function(data, n = NULL,
   
   ## type
   if(missing(type)){
-    type <- "adapt"
+    
+    type <- "threshold"
+    
+    warning('The default for the `type` argument has changed to "threshold"')
+    
   }else{type <- tolower(match.arg(type))}
   
   ## sig
   if(missing(sig)){
     if(type == "threshold"){
       sig <- switch(method,
-                    "cor" = .70,
-                    "pcor" = .20,
-                    "wto" = .20
+                    "cor" = .50,
+                    "pcor" = .35,
+                    "wto" = .25,
+                    "irt" = .35,
       )
     }else{sig <- .05}
-  }
-  
-  ## key
-  if(is.null(key)){
-    key <- colnames(data)
   }
   
   ## reduce
@@ -354,108 +359,354 @@ UVA <- function(data, n = NULL,
     reduce.method <- "latent"
   }else{reduce.method <- match.arg(reduce.method)}
   
-  ## plot.args
-  if(length(plot.args) == 0){
-    plot.args <-list(vsize = 6, alpha = 0.4, label.size = 5, edge.alpha = 0.7)
-  }else{
-    plot.args <- plot.args
-    plots.arg1 <- list(vsize = 6, label.size = 5, alpha = 0.4, edge.alpha = 0.7)
-    plot.args.use <- plot.args
+  ## n
+  if(nrow(data) == ncol(data)){
     
-    if(any(names(plots.arg1) %in% names(plot.args.use))){
-      
-      plot.replace.args <- plots.arg1[na.omit(match(names(plot.args.use), names(plots.arg1)))]
-      
-      plot.args <- c(plot.args.use,plots.arg1[names(plots.arg1) %in% names(plot.args.use)==FALSE])}
-  }
-  
-  ## lavaan.args
-  if(length(lavaan.args) == 0){
-    lavaan.args <- formals(lavaan::cfa)
-    lavaan.args[length(lavaan.args)] <- NULL
-    lavaan.args$std.lv <- TRUE
-  }else{
-    lavaan.default <- formals(lavaan::cfa)
-    lavaan.default[length(lavaan.default)] <- NULL
-    lavaan.default$std.lv <- TRUE
+    cormat <- data
     
-    if(any(names(lavaan.args) %in% names(lavaan.default))){
-      lavaan.default[names(lavaan.args)] <- lavaan.args
+    if(method == "irt"){
+      stop('method = "IRT" requires a dataset to be input')
     }
     
-    lavaan.args <- lavaan.default
+    if(is.null(n)){
+      stop("Argument 'n' must be set for square matrices")
+    }
+    
+    ### Let user know that variables can't be combined
+    if(isTRUE(reduce)){
+      
+      if(reduce.method != "remove"){
+        reduce.method <- "remove"
+        message("Input is a square matrix. Changing 'reduce.method' to \"remove\"")
+      }
+      
+      
+    }
+    
+  }else{### Get n
+    n <- nrow(data)
+    
+    if(method != "irt"){
+      ## Compute correlation matrix
+      cormat <- switch(corr,
+                       "cor_auto" = qgraph::cor_auto(data),
+                       "pearson" = cor(data, use = "pairwise.complete.obs"),
+                       "spearman" = cor(data, method = "spearman", use = "pairwise.complete.obs")
+      )
+      ### Make sure it's positive definite
+      if(any(eigen(cormat)$values < 0)){
+        cormat <- as.matrix(Matrix::nearPD(cormat, keepDiag = TRUE)$mat)
+      }
+    }
   }
   
-  # Perform redundancy analysis
-  process <- redundancy.process(data = data, cormat = cormat,
-                                n = n, model = model, method = method,
-                                type = type, sig = sig,
-                                plot.redundancy = plot.redundancy, plot.args = plot.args)
+  ## prepare arguments for lavaan
+  if(isTRUE(reduce)){
+    
+    if(reduce.method == "latent"){
+      
+      ## lavaan.args
+      if(length(lavaan.args) == 0){
+        lavaan.args <- formals(lavaan::cfa)
+        lavaan.args[length(lavaan.args)] <- NULL
+        lavaan.args$std.lv <- TRUE
+      }else{
+        lavaan.default <- formals(lavaan::cfa)
+        lavaan.default[length(lavaan.default)] <- NULL
+        lavaan.default$std.lv <- TRUE
+        
+        if(any(names(lavaan.args) %in% names(lavaan.default))){
+          lavaan.default[names(lavaan.args)] <- lavaan.args
+        }
+        
+        lavaan.args <- lavaan.default
+      }
+      
+      ## change key if NULL
+      if(is.null(key)){
+        data <- lavaan.formula.names(data)
+      }
+      
+    }
+    
+  }
   
+  ## check for automated procedure
+  ### check for type first
+  if(isTRUE(auto) & type != "threshold"){
+    
+    message("\nWarning: Automated UVA is not recommended for types other than 'reduce.method = \"threshold\"'\n'auto' set to 'FALSE'")
+    auto <- FALSE
+    
+  }
+  
+  ### check for reduce method second
+  if(isTRUE(auto) & isTRUE(reduce) & reduce.method == "remove"){
+    
+    message("\nWarning: Automated UVA is not available for 'reduce.method = \"remove\"'\n'auto' set to 'FALSE'")
+    auto <- FALSE
+    
+  }
+  
+  ## 
+  
+  ## plot.args
+  plot.args <- GGally.args(plot.args)
+  
+  # Perform redundancy analysis
+  process <- suppressWarnings(
+    suppressMessages(
+      redundancy.process(data = data, cormat = cormat,
+                         n = n, model = model, method = method,
+                         type = type, sig = sig,
+                         plot.redundancy = plot.redundancy, plot.args = plot.args)
+    )
+  )
+  
+  ## key
+  if(is.null(key)){
+    
+    if(is.null(colnames(data))){
+      colnames(data) <- paste("V", 1:ncol(data), sep = "")
+    }
+    
+    key <- colnames(data)
+  }
   
   # Get names
-  if(!is.null(key)){
+  if(any(!is.na(process$redundant))){
     process <- redund.names(node.redundant.obj = process, key = key)
   }
   
   # Run through redundancy reduction
-  if(reduce){
-    reduced <- redund.reduce(node.redundant.obj = process,
-                             reduce.method = reduce.method,
-                             plot.args = plot.args,
-                             lavaan.args = lavaan.args,
-                             corr = corr)
+  if(all(is.na(process$redundant))){
     
-    # Check for any remaining redundancies
-    if(adhoc){
-      ## Message user
-      message("Running adhoc check for any potential redundancies remaining...\n")
+    reduced <- process
+    
+    message("No redundant variables were identified.")
+    
+    adhoc.check <- NULL
+    
+  }else{
+    
+    ## Manual
+    if(isTRUE(reduce) & !isTRUE(auto)){
       
-      ## Run check
-      ## Compute correlation matrix
-      cor.data <- switch(corr,
-                         "cor_auto" = qgraph::cor_auto(reduced$data),
-                         "pearson" = cor(reduced$data, use = "pairwise.complete.obs"),
-                         "spearman" = cor(reduced$data, method = "spearman", use = "pairwise.complete.obs")
-      )
+      reduced <- redund.reduce(node.redundant.obj = process,
+                               reduce.method = reduce.method,
+                               plot.args = plot.args,
+                               lavaan.args = lavaan.args,
+                               corr = corr)
       
-      
-      adhoc.check <- suppressMessages(
-        redundancy.process(data = reduced$data, cormat = cor.data,
-                           n = nrow(reduced$data),
-                           model = model,
-                           method = "wto",
-                           type = "threshold", sig = .20,
-                           plot.redundancy = FALSE, plot.args = plot.args)
-      )
+      # Check for any remaining redundancies
+      if(adhoc){
+        ## Message user
+        message("Running adhoc check for any potential redundancies remaining...\n")
+        
+        ## Run check
+        ## Compute correlation matrix
+        if(isSymmetric(reduced$data)){
+          cor.data <- reduced$data
+        }else{
+          
+          cor.data <- switch(corr,
+                             "cor_auto" = qgraph::cor_auto(reduced$data),
+                             "pearson" = cor(reduced$data, use = "pairwise.complete.obs"),
+                             "spearman" = cor(reduced$data, method = "spearman", use = "pairwise.complete.obs")
+          )
+          
+        }
+        
+        adhoc.check <- suppressMessages(
+          redundancy.process(data = reduced$data, cormat = cor.data,
+                             n = n,
+                             model = model,
+                             method = "wto",
+                             type = "threshold", sig = .25,
+                             plot.redundancy = FALSE, plot.args = plot.args)
+        )
+        
+        # Artificial pause for feel
+        Sys.sleep(1)
+        
+      }
       
       # Artificial pause for feel
       Sys.sleep(1)
       
-      if(all(is.na(adhoc.check$redundant))){
+    }else if(isTRUE(reduce) & isTRUE(auto)){## Automated
+      
+      # Message user
+      message("\nCombining variables...", appendLF = FALSE)
+      
+      # Initial reduction
+      reduced <- redund.reduce.auto(node.redundant.obj = process,
+                                    reduce.method = reduce.method,
+                                    lavaan.args = lavaan.args,
+                                    corr = corr)
+      ## Run check
+      ## Compute correlation matrix
+      if(isSymmetric(reduced$data)){
+        cor.data <- reduced$data
+      }else{
         
-        message("Some redundancies may still exist. See `OUTPUT$adhoc`")
+        sink <- capture.output(
+          cor.data <- suppressMessages(
+            suppressWarnings(
+              switch(corr,
+                     "cor_auto" = qgraph::cor_auto(reduced$data),
+                     "pearson" = cor(reduced$data, use = "pairwise.complete.obs"),
+                     "spearman" = cor(reduced$data, method = "spearman", use = "pairwise.complete.obs")
+              )
+            )
+          )
+        )
         
-      }else{message("No redundancies reamin.")}
-    }
+      }
+      
+      adhoc.check <- suppressMessages(
+        redundancy.process(data = reduced$data, cormat = cor.data,
+                           n = n,
+                           model = model,
+                           method = "wto",
+                           type = "threshold", sig = sig,
+                           plot.redundancy = FALSE, plot.args = plot.args)
+      )
+      
+      while(all(!is.na(adhoc.check$redundant))){
+        # Adhoc reductions
+        reduced <- redund.adhoc.auto(node.redundant.obj = adhoc.check,
+                                     node.redundant.reduced = reduced,
+                                     node.redundant.original = process,
+                                     reduce.method = reduce.method,
+                                     lavaan.args = lavaan.args,
+                                     corr = corr)
+        
+        ## Run check
+        ## Compute correlation matrix
+        if(isSymmetric(reduced$data)){
+          cor.data <- reduced$data
+        }else{
+          
+          sink <- capture.output(
+            cor.data <- suppressMessages(
+              suppressWarnings(
+                switch(corr,
+                       "cor_auto" = qgraph::cor_auto(reduced$data),
+                       "pearson" = cor(reduced$data, use = "pairwise.complete.obs"),
+                       "spearman" = cor(reduced$data, method = "spearman", use = "pairwise.complete.obs")
+                )
+              )
+            )
+          )
+          
+        }
+        
+        adhoc.check <- suppressMessages(
+          redundancy.process(data = reduced$data, cormat = cor.data,
+                             n = n,
+                             model = model,
+                             method = "wto",
+                             type = "threshold", sig = sig,
+                             plot.redundancy = FALSE, plot.args = plot.args)
+        )
+        
+      }
+      
+      # Message user
+      message("done")
     
-    # Artificial pause for feel
-    Sys.sleep(1)
+      # # Name latent variables
+      # name_question <- readline(prompt = "Name latent variables? [Y/n]: ")
+      # 
+      # # Check for appropriate response
+      # name_question <- tolower(name_question)
+      # 
+      # while(name_question != "y" & name_question != "n"){
+      #   
+      #   # Name latent variables
+      #   name_question <- readline(prompt = "Inappropriate response. Try again. [Y/n]: ")
+      #   
+      #   # Check for appropriate response
+      #   name_question <- tolower(name_question)
+      #   
+      # }
+      
+      # Name latent variables
+      if(isTRUE(label_latent)){
+        name_question <- "y"
+      }else{
+        name_question <- "n"
+      }
+      
+      if(name_question == "y"){
+        
+        # Copy of reduced merged
+        lats <- reduced$merged
+        
+        # Make it a list
+        lats <- lapply(apply(lats, 1, as.list), unlist)
+        lats <- lapply(lats, unname) # unname
+        lats <- lapply(lats, function(x){ # make them homogeneous with spaces
+          x <- na.omit(ifelse(x == "", NA, x))
+          x <- c(x, "", "")
+          return(x)
+        })
+        
+        # Line break
+        linebreak()
+        
+        # Loop through latent variables
+        for(i in 1:length(lats)){
+          
+          # Variables in latent variable
+          cat(
+            paste(
+              lats[[i]],
+              collapse = "\n"
+            )
+          )
+          
+          # Ask for label
+          lab <- readline(prompt = "New label for latent variable (no quotations): ")
+          
+          # Assign new label
+          colnames(reduced$data)[
+            which(colnames(reduced$data) == row.names(reduced$merged)[i])
+          ] <- lab
+          row.names(reduced$merged)[i] <- lab
+          
+          # Message user for progress
+          message(
+            paste(
+              "\n", i, "of", nrow(reduced$merged), "latent variables named."
+            )
+          )
+          
+          # Line break
+          linebreak()
+          
+        }
+        
+      }
+      
+    }else{reduced <- process}
     
-  }else{reduced <- process}
+  }
   
   # Full results
   res <- list()
   res$redundancy <- process
-  if(reduce){res$reduced <- reduced}
-  if(adhoc){res$adhoc <- adhoc.check}
+  if(reduce){
+    res$reduced <- reduced
+    if(adhoc){res$adhoc <- adhoc.check}
+  }
   
   # Set up methods
   res$Methods <- list()
   res$Methods$method <- method
   res$Methods$type <- type
   res$Methods$sig <- sig
-  res$Methods$adhoc <- adhoc
   if(reduce){
     
     res$Methods$reduce.method <- reduce.method
@@ -465,6 +716,7 @@ UVA <- function(data, n = NULL,
     }
     
   }
+  res$Methods$auto <- auto
     
   # Set class
   class(res) <- "UVA"
@@ -473,3 +725,4 @@ UVA <- function(data, n = NULL,
   
 }
   
+      

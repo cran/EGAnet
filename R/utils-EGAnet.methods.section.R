@@ -2,7 +2,7 @@
 #'
 #' @noRd
 # EGA Methods Section----
-# Updated 27.12.2020
+# Updated 24.10.2021
 EGA.methods.section <- function (object, net.loads, net.scores)
 {
   # Input arguments
@@ -11,6 +11,7 @@ EGA.methods.section <- function (object, net.loads, net.scores)
   # For EGA
   model <- INPUT$model
   algorithm <- INPUT$algorithm
+  corr <- INPUT$corr
   
   # References
   refs <- list()
@@ -19,20 +20,20 @@ EGA.methods.section <- function (object, net.loads, net.scores)
   ## Introduction
   intro.header <- "# Exploratory Graph Analysis"
   
-  # Golino et al. (2020) ==> Golino, Shi, et al. (2020)
-  if(net.loads || net.scores){
+  # Golino et al. (2020) ==> Golino, Shi et al. (2020)
+  if(isTRUE(net.loads) || isTRUE(net.scores)){
     
     intro.text <- paste("&emsp;Exploratory graph analysis (EGA) is a recently developed method to estimate ",
                         "the number of dimensions in multivariate data using undirected network models ",
-                        "(Golino & Epskamp, 2017; Golino, Shi, et al., 2020). EGA first applies a network ",
+                        "(Golino & Epskamp, 2017; Golino, Shi et al., 2020). EGA first applies a network ",
                         "estimation method followed by a community detection algorithm for weighted ",
                         "networks (Fortunato, 2010). EGA has been shown to be as accurate or more accurate ",
                         "than more traditional factor analytic methods such as parallel analysis ",
-                        "(Christensen & Golino, 2020a; Golino, Shi, et al., 2020).",
+                        "(Christensen, Garrido, & Golino, 2021; Golino, Shi, et al., 2020).",
                         sep = "")
     
-    refs$christensenD2020 <- paste("Christensen, A. P., & Golino, H. (2020a).",
-                                   "Estimating factors with psychometric networks: A Monte Carlo simulation comparing community detection algorithms.",
+    refs$christensenC2020 <- paste("Christensen, A. P., Garrido, L. E., & Golino, H. (2021).",
+                                   "Comparing community detection algorithms in psychological data: A Monte Carlo simulation.",
                                    "<em>PsyArXiv</em>.",
                                    "https://doi.org/10.31234/osf.io/hz89e")
     
@@ -44,11 +45,11 @@ EGA.methods.section <- function (object, net.loads, net.scores)
                         "estimation method followed by a community detection algorithm for weighted ",
                         "networks (Fortunato, 2010). EGA has been shown to be as accurate or more accurate ",
                         "than more traditional factor analytic methods such as parallel analysis ",
-                        "(Christensen & Golino, 2020; Golino et al., 2020).",
+                        "(Christensen, Garrido, & Golino, 2021; Golino et al., 2020).",
                         sep = "")
     
-    refs$christensenD2020 <- paste("Christensen, A. P., & Golino, H. (2020).",
-                                   "Estimating factors with psychometric networks: A Monte Carlo simulation comparing community detection algorithms.",
+    refs$christensenC2020 <- paste("Christensen, A. P., Garrido, L. E., & Golino, H. (2021).",
+                                   "Comparing community detection algorithms in psychological data: A Monte Carlo simulation.",
                                    "<em>PsyArXiv</em>.",
                                    "https://doi.org/10.31234/osf.io/hz89e")
     
@@ -56,18 +57,39 @@ EGA.methods.section <- function (object, net.loads, net.scores)
   
   refs$golinoB2017 <- paste("Golino, H., & Epskamp, S. (2017).",
                             "Exploratory Graph Analysis: A new approach for estimating the number of dimensions in psychological research.",
-                            "<em>PloS ONE</em>, <em>12</em>, e0174035.",
+                            "<em>PloS ONE</em>, <em>12</em>(6), e0174035.",
                             "https://doi.org/10.1371/journal.pone.0174035")
   
   refs$golinoC2020 <- paste("Golino, H., Shi, D., Christensen, A. P., Garrido, L. E., Nieto, M. D., Sadana, R., ... Martinez-Molina, A. (2020).",
                             "Investigating the performance of Exploratory Graph Analysis and traditional techniques to identify the number of latent factors: A simulation and tutorial.",
-                            "<em>Psychological Methods</em>, <em>25</em>, 292--320.",
+                            "<em>Psychological Methods</em>, <em>25</em>(3), 292--320.",
                             "https://doi.org/10.1037/met0000255")
   
   refs$fortunato2009 <- paste("Fortunato, S. (2010).",
-                              "Community detectionin graphs.",
-                              "<em>Physics Reports</em>, <em>3--5</em>, 75--174.",
-                              "https://doi.org/10.1037/met0000255")
+                              "Community detection in graphs.",
+                              "<em>Physics Reports</em>, <em>486</em>(3--5), 75--174.",
+                              "https://doi.org/10.1016/j.physrep.2009.11.002")
+  
+  ## Correlations
+  corr.method <- switch(
+    corr,
+    "cor_auto" = "The `cor_auto()` function in the *qgraph* package (Epskamp et al., 2012) in R",
+    "pearson" = "Pearson's correlation",
+    "spearman" = "Spearman's rho correlation"
+    
+  )
+  
+  corr.text <- paste("", corr.method, "was used to compute the correlation matrix for the network estimation method.")
+  
+  
+  if(corr == "cor_auto"){
+    
+    refs$epskampA2012 <- paste("Epskamp, S., Cramer, A. O. J., Waldorp, L. J., Schmittmann, V. D., & Borsboom, D. (2012).",
+                               "qgraph: Network visualizations of relationships in psychometric data.",
+                               "<em>Journal of Statistical Software</em>, <em>48</em>, 1--18.",
+                               "https://doi.org/10.18637/jss.v048.i04")
+    
+  }
   
   ## Description of network estimation method
   model.header <- "## Network Estimation Method"
@@ -78,36 +100,74 @@ EGA.methods.section <- function (object, net.loads, net.scores)
     lambda <- INPUT$lambda
     gamma <- INPUT$gamma
     
-    model.text <- paste("&emsp;This study applied the graphical least absolute shrinkage and selection operator ",
-                        "(GLASSO; Friedman, Haste, & Tibshirani, 2008, 2014), which estimates a Gaussian ",
-                        "Graphical Model (GGM; Lauritzen, 1996) where nodes (circles) represent variables ",
-                        "and edges (lines) represent the conditional dependence (or partial correlations) ",
-                        "between nodes given all other nodes in the network. The least absolute shrinkage ",
-                        "and selection operator (LASSO; Tibshirani, 1996) of the GLASSO is a regularization ",
-                        "technique that reduces parameter estimates with some estimates becoming exactly zero. ",
-                        "\n\n",
-                        "&emsp;The LASSO uses a parameter called lambda ($\\lambda$), which controls the sparsity of the network. ",
-                        "Lower values of $\\lambda$ remove fewer edges, increasing the possibility of including ",
-                        "spurious correlations, while larger values of $\\lambda$ remove more edges, increasing ",
-                        "the possibility of removing relevant edges. When $\\lambda$ = 0, then the estimates are ",
-                        "equal to the ordinary least squares solution for the partial correlation matrix. ",
-                        "In this study, the ratio of the minimum and maximum $\\lambda$ was set to ", lambda, ".",
-                        "\n\n",
-                        "&emsp;The popular approach in the network psychometrics literature is to compute models ",
-                        "across several values of $\\lambda$ (usually 100) and to select the model that minimizes ",
-                        "the extended Bayesian information criterion (EBIC; Chen & Chen, 2008; Epskamp & Fried, 2018). ",
-                        "The EBIC model selection uses a hyperparameter gamma ($\\gamma$) to control how much it prefers simpler models ",
-                        "(i.e., models with fewer edges; Foygel & Drton, 2010). Larger $\\gamma$ values lead to simpler models, ",
-                        "while smaller $\\gamma$ values lead to denser models. When $\\gamma$ = 0, the EBIC is equal to the Bayesian ",
-                        "information criterion. In this study, $\\gamma$ was set to ", gamma, ". In network psychometrics literature, ",
-                        "this approach has been termed *EBICglasso* and is applied using the *qgraph* package (Epskamp et al., 2012) ",
-                        "in R.",
-                        sep = ""
-    )
+    if(corr == "cor_auto"){
+      
+      model.text <- paste("&emsp;This study applied the graphical least absolute shrinkage and selection operator ",
+                          "(GLASSO; Friedman, Haste, & Tibshirani, 2008, 2014), which estimates a Gaussian ",
+                          "Graphical Model (GGM; Lauritzen, 1996) where nodes (circles) represent variables ",
+                          "and edges (lines) represent the conditional dependence (or partial correlations) ",
+                          "between nodes given all other nodes in the network. The least absolute shrinkage ",
+                          "and selection operator (LASSO; Tibshirani, 1996) of the GLASSO is a regularization ",
+                          "technique that reduces parameter estimates with some estimates becoming exactly zero. ",
+                          "\n\n",
+                          "&emsp;The LASSO uses a parameter called lambda ($\\lambda$), which controls the sparsity of the network. ",
+                          "Lower values of $\\lambda$ remove fewer edges, increasing the possibility of including ",
+                          "spurious correlations, while larger values of $\\lambda$ remove more edges, increasing ",
+                          "the possibility of removing relevant edges. When $\\lambda$ = 0, the estimates are ",
+                          "equal to the ordinary least squares solution for the partial correlation matrix. ",
+                          "In this study, the ratio of the minimum and maximum $\\lambda$ was set to ", lambda, ".",
+                          "\n\n",
+                          "&emsp;The popular approach in the network psychometrics literature is to compute models ",
+                          "across several values of $\\lambda$ (usually 100) and to select the model that minimizes ",
+                          "the extended Bayesian information criterion (EBIC; Chen & Chen, 2008; Epskamp & Fried, 2018). ",
+                          "The EBIC model selection uses a hyperparameter gamma ($\\gamma$) to control how much it prefers simpler models ",
+                          "(i.e., models with fewer edges; Foygel & Drton, 2010). Larger $\\gamma$ values lead to simpler models, ",
+                          "while smaller $\\gamma$ values lead to denser models. When $\\gamma$ = 0, the EBIC is equal to the Bayesian ",
+                          "information criterion. In this study, $\\gamma$ was set to ", gamma, ". In network psychometrics literature, ",
+                          "this approach has been termed *EBICglasso* and is applied using the *qgraph* package.",
+                          sep = ""
+      )
+      
+    }else{
+      
+      model.text <- paste("&emsp;This study applied the graphical least absolute shrinkage and selection operator ",
+                          "(GLASSO; Friedman, Haste, & Tibshirani, 2008, 2014), which estimates a Gaussian ",
+                          "Graphical Model (GGM; Lauritzen, 1996) where nodes (circles) represent variables ",
+                          "and edges (lines) represent the conditional dependence (or partial correlations) ",
+                          "between nodes given all other nodes in the network. The least absolute shrinkage ",
+                          "and selection operator (LASSO; Tibshirani, 1996) of the GLASSO is a regularization ",
+                          "technique that reduces parameter estimates with some estimates becoming exactly zero. ",
+                          "\n\n",
+                          "&emsp;The LASSO uses a parameter called lambda ($\\lambda$), which controls the sparsity of the network. ",
+                          "Lower values of $\\lambda$ remove fewer edges, increasing the possibility of including ",
+                          "spurious correlations, while larger values of $\\lambda$ remove more edges, increasing ",
+                          "the possibility of removing relevant edges. When $\\lambda$ = 0, the estimates are ",
+                          "equal to the ordinary least squares solution for the partial correlation matrix. ",
+                          "In this study, the ratio of the minimum and maximum $\\lambda$ was set to ", lambda, ".",
+                          "\n\n",
+                          "&emsp;The popular approach in the network psychometrics literature is to compute models ",
+                          "across several values of $\\lambda$ (usually 100) and to select the model that minimizes ",
+                          "the extended Bayesian information criterion (EBIC; Chen & Chen, 2008; Epskamp & Fried, 2018). ",
+                          "The EBIC model selection uses a hyperparameter gamma ($\\gamma$) to control how much it prefers simpler models ",
+                          "(i.e., models with fewer edges; Foygel & Drton, 2010). Larger $\\gamma$ values lead to simpler models, ",
+                          "while smaller $\\gamma$ values lead to denser models. When $\\gamma$ = 0, the EBIC is equal to the Bayesian ",
+                          "information criterion. In this study, $\\gamma$ was set to ", gamma, ". In network psychometrics literature, ",
+                          "this approach has been termed *EBICglasso* and is applied using the *qgraph* package (Epskamp et al., 2012) ",
+                          "in R.",
+                          sep = ""
+      )
+      
+      
+      refs$epskampA2012 <- paste("Epskamp, S., Cramer, A. O. J., Waldorp, L. J., Schmittmann, V. D., & Borsboom, D. (2012).",
+                                 "qgraph: Network visualizations of relationships in psychometric data.",
+                                 "<em>Journal of Statistical Software</em>, <em>48</em>, 1--18.",
+                                 "https://doi.org/10.18637/jss.v048.i04")
+      
+    }
     
     refs$friedman2008 <- paste("Friedman, J., Hastie, T., & Tibshirani, R. (2008).",
                                "Sparse inverse covariance estimation with the graphical lasso.",
-                               "<em>Biostatistics</em>, <em>9</em>, 432--441.",
+                               "<em>Biostatistics</em>, <em>9</em>(3), 432--441.",
                                "https://doi.org/10.1093/biostatistics/kxm045")
     
     refs$friedman2014 <- paste("Friedman, J., Hastie, T., & Tibshirani, R. (2014).",
@@ -120,17 +180,17 @@ EGA.methods.section <- function (object, net.loads, net.scores)
     
     refs$tibshirani1996 <- paste("Tibshirani, R. (1996).",
                                  "Regression shrinkage and selection via the lasso.",
-                                 "<em>Journal of the Royal Statistical Society. Series B (Methodological)</em>, 267--288.",
+                                 "<em>Journal of the Royal Statistical Society. Series B (Methodological)</em>, <em>58</em>(1), 267--288.",
                                  "https://doi.org/10.1111/j.2517-6161.1996.tb02080.x")
     
     refs$chen2008 <- paste("Chen, J., & Chen, Z. (2008).",
                            "Extended bayesian information criteria for model selection with large model spaces.",
-                           "<em>Biometrika</em>, <em>95</em>, 759--771.",
+                           "<em>Biometrika</em>, <em>95</em>(3), 759--771.",
                            "https://doi.org/10.1093/biomet/asn034")
     
     refs$epskampB2018 <- paste("Epskamp, S., & Fried, E. I. (2018).",
                                "A tutorial on regularized partial correlation networks.",
-                               "<em>Psychological Methods</em>, <em>23</em>, 617--634.",
+                               "<em>Psychological Methods</em>, <em>23(4)</em>, 617--634.",
                                "https://doi.org/10.1037/met0000167")
     
     refs$foygel2010 <- paste("Foygel, R., & Drton, M. (2010).",
@@ -138,11 +198,6 @@ EGA.methods.section <- function (object, net.loads, net.scores)
                              "In J. D. Lafferty, C. K. I. Williams, J. Shawe-Taylor, R. S., Zemel, & A. Culotta (Eds.),",
                              "<em>Advances in neural information processing systems</em> (pp. 604--612).",
                              "Retrieved from http://papers.nips.cc/paper/4087-extended-bayesianinformation-criteria-for-gaussian-graphical-models")
-    
-    refs$epskampA2012 <- paste("Epskamp, S., Cramer, A. O. J., Waldorp, L. J., Schmittmann, V. D., & Borsboom, D. (2012).",
-                               "qgraph: Network visualizations of relationships in psychometric data.",
-                               "<em>Journal of Statistical Software</em>, <em>48</em>, 1--18.",
-                               "https://doi.org/10.18637/jss.v048.i04")
     
   }else if(model == "TMFG")
   {
@@ -154,7 +209,7 @@ EGA.methods.section <- function (object, net.loads, net.scores)
                         "\n\n",
                         "&emsp;Network estimation starts with a tetrahedron that is comprised of the four nodes ",
                         "that have the high sum of correlations that are greater than the average correlation in ",
-                        "the correlation matrix. Next, the algorithm identifies a node that is not connected in the ",
+                        "the correlation matrix. Next, the algorithm identifies the node that is not connected in the ",
                         "network and maximizes its sum of correlations to three nodes already in the network. This ",
                         "node is then connected to those three nodes. This process continues iteratively until ",
                         "every node is connected in the network.",
@@ -174,22 +229,22 @@ EGA.methods.section <- function (object, net.loads, net.scores)
     
     refs$massara2016 <- paste("Massara, G. P., Di Matteo, T., & Aste, T. (2016).",
                               "Network filtering for big data: Triangulated maximally filtered graph.",
-                              "<em>Journal of Complex Networks</em>, <em>5</em>, 161--178.",
+                              "<em>Journal of Complex Networks</em>, <em>5</em>(2), 161--178.",
                               "https://doi.org/10.1093/comnet/cnw015")
     
     refs$tumminello2005 <- paste("Tumminello, M., Aste, T., Di Matteo, T., & Mantegna, R. N. (2005).",
                                  "A tool for filtering information in complex systems.",
-                                 "<em>Proceedings of the National Academy of Sciences</em>, <em>102</em>, 10421--10426.",
+                                 "<em>Proceedings of the National Academy of Sciences</em>, <em>102</em>(30), 10421--10426.",
                                  "https://doi.org/10.1073/pnas.0500298102")
     
     refs$song2012 <- paste("Song, W.-M., Di Matteo, T., & Aste, T. (2012).",
                            "Hierarchical information clustering by means of topologically embedded graphs.",
-                           "<em>PLoS ONE</em>, <em>7</em>, e31929.",
+                           "<em>PLoS ONE</em>, <em>7</em>(3), e31929.",
                            "https://doi.org/10.1371/journal.pone.0031929")
     
     refs$christensenA2018 <- paste("Christensen, A. P. (2018).",
                                    "NetworkToolbox: Methods and measures for brain, cognitive, and psychometric network analysis in R.",
-                                   "<em>The R Journal</em>, <em>10</em>, 422--439.",
+                                   "<em>The R Journal</em>, <em>10</em>(2), 422--439.",
                                    "https://doi.org/10.32614/RJ-2018-065")
   }
   
@@ -200,23 +255,43 @@ EGA.methods.section <- function (object, net.loads, net.scores)
   {
     steps <- INPUT$steps
     
-    algorithm.text <- paste("&emsp;The Walktrap algorithm (Pons & Latapy, 2006) is a commonly applied community detection algorithm in ",
-                            "the psychometric network literature (Golino & Epskamp, 2017; Golino, Shi, et al., 2020). The algorithm begins ",
-                            "by computing a transition matrix where each element represents the probability of one node traversing to ",
-                            "another (based on node strength or the sum of the connections to each node). Random walks are then initiated ",
-                            "for a certain number of steps (e.g., ", steps, ") using the transition matrix for probable destinations. Using ",
-                            "Ward's agglomerative clustering approach (Ward, 1963), each node starts as its own cluster and merges ",
-                            "with adjacent clusters (based on squared distances between each cluster) in a way that minimizes the sum of ",
-                            "squared distances between other clusters. Modularity (Newman, 2006) is then used to determine the optimal ",
-                            "partition of clusters (i.e., communities). The Walktrap algorithm was implemented using the *igraph* ",
-                            "package (Csardi & Nepusz, 2006) in R.",
-                            sep = ""
-    )
+    # Golino et al. (2020) ==> Golino, Shi et al. (2020)
+    if(isTRUE(net.loads) || isTRUE(net.scores)){
+      
+      algorithm.text <- paste("&emsp;The Walktrap algorithm (Pons & Latapy, 2006) is a commonly applied community detection algorithm in ",
+                              "the psychometric network literature (Golino & Epskamp, 2017; Golino, Shi et al., 2020). The algorithm begins ",
+                              "by computing a transition matrix where each element represents the probability of one node traversing to ",
+                              "another (based on node strength or the sum of the connections to each node). Random walks are then initiated ",
+                              "for a certain number of steps (e.g., ", steps, ") using the transition matrix for probable destinations. Using ",
+                              "Ward's agglomerative clustering approach (Ward, 1963), each node starts as its own community and merges ",
+                              "with adjacent communities (based on squared distances between each community) in a way that minimizes the sum of ",
+                              "squared distances between other communities. Modularity (Newman, 2006) is then used to determine the optimal ",
+                              "partition of communities. The Walktrap algorithm was implemented using the *igraph* ",
+                              "package (Csardi & Nepusz, 2006) in R.",
+                              sep = ""
+      )
+      
+    }else{
+      
+      algorithm.text <- paste("&emsp;The Walktrap algorithm (Pons & Latapy, 2006) is a commonly applied community detection algorithm in ",
+                              "the psychometric network literature (Golino & Epskamp, 2017; Golino et al., 2020). The algorithm begins ",
+                              "by computing a transition matrix where each element represents the probability of one node traversing to ",
+                              "another (based on node strength or the sum of the connections to each node). Random walks are then initiated ",
+                              "for a certain number of steps (e.g., ", steps, ") using the transition matrix for probable destinations. Using ",
+                              "Ward's agglomerative clustering approach (Ward, 1963), each node starts as its own community and merges ",
+                              "with adjacent communities (based on squared distances between each community) in a way that minimizes the sum of ",
+                              "squared distances between other communities. Modularity (Newman, 2006) is then used to determine the optimal ",
+                              "partition of communities. The Walktrap algorithm was implemented using the *igraph* ",
+                              "package (Csardi & Nepusz, 2006) in R.",
+                              sep = ""
+      )
+      
+    }
     
     refs$pons2006 <- paste("Pons, P., & Latapy, M. (2006).",
                            "Computing communities in large networks using random walks.",
-                           "<em>Journal of Graph Algorithms and Applications</em>, <em>10</em>, 191--218.",
-                           "https://doi.org/10.7155/jgaa.00185")
+                           "<em>Journal of Graph Algorithms and Applications</em>, <em>10</em>(2), 191--218.",
+                           "https://doi.org/10.7155/jgaa.00124")
     
     refs$ward1963 <- paste("Ward, J. H. (1963).",
                            "Hierarchical clustering to optimise an objective function.",
@@ -224,7 +299,7 @@ EGA.methods.section <- function (object, net.loads, net.scores)
     
     refs$newman2006 <- paste("Newman, M. E. J. (2006).",
                              "Modularity and community structure in networks.",
-                             "<em>Proceedings of the National Academy of Sciences</em>, <em>103</em>, 8577--8582.",
+                             "<em>Proceedings of the National Academy of Sciences</em>, <em>103</em>(23), 8577--8582.",
                              "https://doi.org/10.1073/pnas.0601602103")
     
     refs$csardi2006 <- paste("Csardi, G., & Nepusz, T. (2006).",
@@ -235,7 +310,7 @@ EGA.methods.section <- function (object, net.loads, net.scores)
   }else if(algorithm == "louvain")
   {
     algorithm.text <- paste("&emsp;The Louvain algorithm (also referred to as Multi-level; Blondel, Guillaume, Lambiotte, & Lefebvre, 2008)",
-                            "is one of the most commonly applied in network science (Gates, Henry, Steinley, & Fair, 2016). The algorithm",
+                            "is one of the most commonly applied community detection algorithms in network science (Gates, Henry, Steinley, & Fair, 2016). The algorithm",
                             "begins by randomly sorting nodes into communities with their neighbors and then uses",
                             "modularity (Newman, 2006) to iteratively optimize its community partitions by exchanging nodes between communities",
                             "and evaluating the change in modularity until it no longer improves.",
@@ -243,7 +318,7 @@ EGA.methods.section <- function (object, net.loads, net.scores)
                             "nodes, which provides a multi-level structure (Gates et al., 2016). In this study, the",
                             "algorithm was not used to identify hierarchical community structures in the network.",
                             "The Louvain algorithm was implemented using the *igraph* package (Csardi & Nepusz, 2006) in R.",
-                            "It's also important to note that the algorithm implemented in *igraph* is deterministic;",
+                            "It's important to note that the algorithm implemented in *igraph* is deterministic;",
                             "however, other implementations are not (Gates et al., 2016)."
     )
     
@@ -259,13 +334,64 @@ EGA.methods.section <- function (object, net.loads, net.scores)
     
     refs$newman2006 <- paste("Newman, M. E. J. (2006).",
                              "Modularity and community structure in networks.",
-                             "<em>Proceedings of the National Academy of Sciences</em>, <em>103</em>, 8577--8582.",
+                             "<em>Proceedings of the National Academy of Sciences</em>, <em>103</em>(23), 8577--8582.",
                              "https://doi.org/10.1073/pnas.0601602103")
+    
+    refs$csardi2006 <- paste("Csardi, G., & Nepusz, T. (2006).",
+                             "The igraph software package for complex network research.",
+                             "<em>InterJournal, Complex Systems</em>, <em>1695</em>, 1--9.",
+                             "Retrieved from https://pdfs.semanticscholar.org/1d27/44b83519657f5f2610698a8ddd177ced4f5c.pdf")
+    
   }else{
     
-    algorithm.text <- paste("&emsp;A default algorithm was not used in EGA. Write your own damn community detection algorithm section &#128540;")
+    algorithm.text <- paste("&emsp;A default algorithm was not used in EGA. I suppose you'll have to write your own community detection algorithm section")
     
   }
+  
+  ## Unidimensionality
+  uni.method <- INPUT$uni.method
+  
+  if(uni.method == "LE"){
+    
+    unidimensional.text <- paste("\n&emsp;To check for unidimensionality, we used the Leading Eigenvalue algorithm (Newman, 2006) approach, which",
+                                 "was applied to the zero-order correlation matrix (Christensen et al., 2021). The algorithm is based", 
+                                 "on spectral properties of the network using the eigenvector of the first eigenvalue of the modularity matrix to",
+                                 "determine optimal community structures. The algorithm begins by computing the first eigenvector of the modularity",
+                                 "matrix and then splits the network into two communities with the aim of improving modularity. This process iteratively",
+                                 "unfolds until there is no longer improvement in modularity. If the algorithm returns one dimension, then the result",
+                                 "unidimensional; otherwise, the standard EGA procedure is followed (Christensen et al., 2021). The Leading Eigenvalue",
+                                 "algorithm was implemented using the *igraph* package."
+    )
+    
+  }else if (uni.method == "expand"){
+    
+    # Golino et al. (2020) ==> Golino, Shi et al. (2020)
+    if(isTRUE(net.loads) || isTRUE(net.scores)){
+      
+      unidimensional.text <- paste("\n&emsp;To check for unidimensionality, we used Golino, Shi et al.'s (2020) unidimensionality adjustment, which",
+                                   "generates four variables that load strongly (.70) on a single factor and adds them to the empirical data.",
+                                   "EGA is then applied to the combined dataset. For computational efficiency and statistical precision, this",
+                                   "approached was adapted to \"expand\" the empirical correlation matrix to add four variables that are", 
+                                   "correlated .50 with each other (roughly equivalent to factor loadings of .70) and .00 with all other",
+                                   "variables (i.e., empirical variables; Christensen et al., 2021). This approach avoids adding noise in the form of",
+                                   "spurious correlations between generated and empirical variables (i.e., they are exactly orthogonal)."
+      )
+      
+    }else{
+      
+      unidimensional.text <- paste("\n&emsp;To check for unidimensionality, we used Golino et al.'s (2020) unidimensionality adjustment, which",
+                                   "generates four variables that load strongly (.70) on a single factor and adds them to the empirical data.",
+                                   "EGA is then applied to the combined dataset. For computational efficiency and statistical precision, this",
+                                   "approached was adapted to \"expand\" the empirical correlation matrix to add four variables that are", 
+                                   "correlated .50 with each other (roughly equivalent to factor loadings of .70) and .00 with all other",
+                                   "variables (i.e., empirical variables; Christensen et al., 2021). This approach avoids adding noise in the form of",
+                                   "spurious correlations between generated and empirical variables (i.e., they are exactly orthogonal)."
+      )
+      
+    }
+
+  }
+  
   
   if(net.loads || net.scores){
     
@@ -275,31 +401,37 @@ EGA.methods.section <- function (object, net.loads, net.scores)
     nl.text <- paste("&emsp;A recent simulation study by Hallquist, Wright, and Molenaar (2019) demonstrated that ",
                      "the network measure *node strength* or the absolute sum of a node's edge weights is related to ",
                      "confirmatory factor analysis loadings. In their simulation, they found that node strength represented ",
-                     "a combination of dominant and cross-factor loadings. Christensen and Golino (2020b) recently proposed ",
-                     'an adapted node strength measure that splits a node\'s "strength" between the dimensions between ',
-                     "dimensions (e.g., ones found by EGA). They called this measure *network loadings* because it was ",
-                     "demonstrated to be relatively equivalent to factor loadings when data were generated from a ",
-                     "factor model.",
+                     "a combination of dominant and cross-factor loadings. Christensen and Golino (2021) recently proposed ",
+                     'an adapted node strength measure that splits a node\'s "strength" between the dimensions ',
+                     "(e.g., ones found by EGA). They called this measure *network loadings* because it was ",
+                     "demonstrated to be roughly equivalent to factor loadings when data were generated from a ",
+                     "factor model. Effect sizes were determined to be small (0.15), moderate (0.25), and large (0.35) ",
+                     "based on the seminal simulation study (Christensen & Golino, 2021).",
                      "\n\n",
-                     "&emsp;Conceptually, network loadings are the standardized node's strength split between dimensions (see ",
-                     "Christensen & Golino, 2020b for mathematical notation). As with factor loadings, the signs of the loadings ",
+                     "&emsp;Conceptually, network loadings are the standardized node's strength split between communities (see ",
+                     "Christensen & Golino, 2021 for mathematical notation). As with factor loadings, the signs of the loadings ",
                      "are added after the loadings have been estimated (following the same procedure as factor loadings; ",
                      "Comrey & Lee, 2013). In contrast to factor loadings, the network loadings are computed after the ",
                      "number of dimensions have been estimated. In EGA, variables are deterministically assigned to ",
                      "dimensions via a community detection algorithm. Importantly, some variables in the network may not be ",
-                     "connected to other variables in other dimensions. This means that some variables may have a loading of ",
+                     "connected to other variables in other communities. This means that some variables may have a loading of ",
                      "zero in some dimensions. This represents a loading structure that is between a confirmatory (CFA) and exploratory (EFA) ",
-                     "factor analysis loading matrix (Christensen & Golino, 2020b).",
+                     "factor analysis loading matrix (Christensen & Golino, 2021).",
                      sep = "")
     
-    refs$christensenE2020 <- paste("Christensen, A. P., & Golino, H. (2020b).",
+    refs$christensenE2020 <- paste("Christensen, A. P., & Golino, H. (2021).",
                                    "On the equivalency of factor and network loadings.",
-                                   "<em>Behavior Research Methods</em>.",
+                                   "<em>Behavior Research Methods</em>, <em>53</em>, 1563--1580",
                                    "https://doi.org/10.3758/s13428-020-01500-6")
     
     refs$comrey2013 <- paste("Comrey, A. L., & Lee, H. B. (2013).",
                              "<em>A first course in factor analysis</em> (2nd ed.).",
                              "New York, NY: Psychology Press.")
+    
+    refs$hallquist2019 <- paste("Hallquist, M., Wright, A. C. G., & Molenaar, P. C. M. (2019).",
+                                "Problems with centrality measures in psychopathology symptom networks: Why network psychometrics cannot escape psychometric theory.",
+                                "<em>Multivariate Behavioral Research</em>.",
+                                "https://doi.org/10.1080/00273171.2019.1640103")
   }
   
   if(net.scores){
@@ -309,25 +441,26 @@ EGA.methods.section <- function (object, net.loads, net.scores)
     
     ns.text <- paste("&emsp;Network loadings form the foundation for computing network scores. The structure of the network loading ",
                      "matrix captures cross-loading information that is often lost in typical CFA structures but only retains the ",
-                     "most important cross-loadings of EFA (Golino, Christensen, Moulder, Kim, & Boker, 2020). Network scores are ",
+                     "most important cross-loadings of EFA (Golino, Christensen, Moulder, Kim, & Boker, 2021). Network scores are ",
                      "computed by first dividing the standardized network loadings of a dimension by the corresponding variable's standard deviations, ",
-                     "forming weights. Relative weights are then obtained by dividing the weights by the sum of the weights in the dimension. ",
-                     "These relative weights are then multiplied by their corresponding variables and summed to form a dimension score ",
-                     "(see Golino, Christensen, et al., 2020 for mathematical notation). By means of simulation, Golino, Christensen, and colleagues (2020) demonstrate ",
+                     "forming relative weights. These weights are then standardized by dividing them by the sum of the weights in the dimension. ",
+                     "These standardized relative weights are then multiplied by their corresponding variables and summed to form a dimension score ",
+                     "(see Golino, Christensen et al., 2021 for mathematical notation). By means of simulation, Golino, Christensen, and colleagues (2021) demonstrated ",
                      "that these network scores are strongly correlated (&GreaterEqual;.90) with factor scores. ",
                      sep = "")
     
-    refs$golinoA2020 <- paste("Golino, H., Christensen, A. P., Moulder, R., Kim, S., & Boker, S. (2020).",
+    refs$golinoA2020 <- paste("Golino, H., Christensen, A. P., Moulder, R., Kim, S., & Boker, S. (2021).",
                               "Modeling latent topics in social media using Dynamic Exploratory Graph Analysis: The case of the right-wing and left-wing trolls in the 2016 US elections.",
-                              "<em>PsyArXiv</em>.",
+                              "<em>Psychometrika</em>.",
                               "https://doi.org/10.31234/osf.io/tfs7c")
     
   }
   
   # Organize text output
-  markobj <- paste(intro.header, intro.text,
+  markobj <- paste(intro.header, intro.text, corr.text,
                    model.header, model.text,
                    algorithm.header, algorithm.text,
+                   unidimensional.text,
                    sep = "\n")
   
   # Other statistics
@@ -381,23 +514,22 @@ bootEGA.methods.section <- function (object, dim.stability, item.stability)
   # Set up text
   ## Introduction
   intro.header <- "# Bootstrap Exploratory Graph Analysis"
-  intro.text <- paste("&emsp;Bootstrap exploratory graph nalysis (bootEGA) is a recently developed method to estimate ",
-                      "and evaluate the dimensional structure estimated using EGA (Christensen & Golino, 2019). ",
-                      "(Golino & Epskamp, 2017; Golino et al., 2020). The general approach of bootEGA is generate ",
-                      "*X* number of bootstrap samples and apply EGA to each replicate sample, forming ",
-                      "a sampling distribution of EGA results.",
+  intro.text <- paste("&emsp;Bootstrap exploratory graph analysis (bootEGA) is a recently developed method to estimate ",
+                      "and evaluate the dimensional structure estimated using EGA (Christensen & Golino, 2021). ",
+                      "The general approach of bootEGA is generate *X* number of bootstrap samples and apply EGA to each ",
+                      "replicate sample, forming a sampling distribution of EGA results.",
                       sep = "")
   
-  refs$christensenC2019 <- paste("Christensen, A. P., & Golino, H. (2019).",
+  refs$christensenD2019 <- paste("Christensen, A. P., & Golino, H. (2021).",
                                  "Estimating the stability of the number of factors via Bootstrap Exploratory Graph Analysis: A tutorial.",
-                                 "<em>PsyArXiv</em>.",
-                                 "https://doi.org/10.31234/osf.io/9deay")
+                                 "<em>Psych</em>, <em>3(3)</em>, 479--500.",
+                                 "https://doi.org/10.3390/psych3030032")
   
   ## Type of bootstrap
   if(type == "parametric"){
     
     type.text <- paste("&emsp;The parametric bootstrap procedure was implemented in this study. This procedure begins by ",
-                       "estimating a network using EGA and then generating new replicate data from a multivariate ",
+                       "using the correlation matrix to generate new replicate data from a multivariate ",
                        "normal distribution (with the same number of cases as the original data). EGA is then applied ",
                        "to the replicate data, continuing iteratively until the desired number of samples is achieved ",
                        "(e.g., ", iterations, "). The result is a sampling distribution of EGA networks.",
@@ -437,23 +569,16 @@ bootEGA.methods.section <- function (object, dim.stability, item.stability)
                      "samples was computed. Structural consistency is defined as the extent to which a dimension is ",
                      "interrelated (internal consistency) *and* homogeneous (test homogeneity) in the precense of other ",
                      "related dimensions (Christensen, Golino, & Silvia, 2020). Such a measure provides an alternative ",
-                     "yet complementary approach to internal consistency measures in the factor analysic framework.", 
+                     "yet complementary approach to internal consistency measures in the factor analysic framework. ",
+                     "Based on Christensen and Golino's (2021) simulation, values of item stability &GreaterEqual;.75 ",
+                     "are considered acceptable. By extension, structural consistency values of &GreaterEqual;.75 are ",
+                     "considered acceptable.",
                      sep = "")
-    
-    sc.ender <- paste('&emsp;For structural consistency, values of what are "acceptable" have not been established, ',
-                      "and general rules of thumb are subject to the scale developer's intent (Christensen et al., 2020). ",
-                      "In our case, the goal [was to hae separate but related constructs that were interrelated.] This means ",
-                      "that we expected that some dimensions may be less stable than others due to some of their interrelations. ",
-                      "Because of this, we set a value of **[.75]** or higher (i.e., a dimension replicating exactly across **[75%]** ",
-                      "of the bootstrap samples) as our benchmark for acceptable.",
-                      sep = "")
     
     refs$christensenF2020 <- paste("Christensen, A. P., Golino, H., & Silvia, P. J. (2020).",
                                    "A psychometric network perspective on the validity and validation of personality trait questionnaires.",
-                                   "<em>European Journal of Personality</em>, <em>34</em>, 1095--1108.",
+                                   "<em>European Journal of Personality</em>, <em>34</em>(6), 1095--1108.",
                                    "https://doi.org/10.1002/per.2265")
-    
-    message("Make sure to REPLACE text in [brackets]!")
   }
   
   if(item.stability){
@@ -461,13 +586,8 @@ bootEGA.methods.section <- function (object, dim.stability, item.stability)
     is.text <- paste("&emsp; Another metric of stuctural consistency is *item stability* or the robustness of each item's placement within ",
                      "each empirically derived dimension. Item stability is estimated by computing the proportion of times each item is ",
                      "placed in each dimension. This metric provides information about which items are leading to structural consistency ", 
-                     "(replicating often in their empirically derived dimension) or inconsistency (replicating in often in other dimensions).",
+                     "(replicating often in their empirically derived dimension) or inconsistency (replicating often in other dimensions).",
                      sep = "")
-    
-    sc.ender <- paste(sc.ender,
-                      " We set a similar benchmark for the item stabilitiy where items were expected to replicate at least **[75%]** of the time ",
-                      "in their empirically derived dimension (i.e., EGA).",
-                      sep = "")
     
   }
   
@@ -479,9 +599,7 @@ bootEGA.methods.section <- function (object, dim.stability, item.stability)
     markobj <- paste(markobj, sc.header, sc.text, sep = "\n\n")
     
     if(item.stability){
-      markobj <- paste(markobj, is.text, sc.ender, sep = "\n\n")
-    }else{
-      markobj <- paste(markobj, sc.ender, sep = "\n\n")
+      markobj <- paste(markobj, is.text, sep = "\n\n")
     }
     
   }
@@ -513,8 +631,6 @@ dynEGA.methods.section <- function (object)
 # Updated 14.01.2021
 UVA.methods.section <- function (object)
 {
-  # Not ready yet
-  stop("UVA Methods section is still being developed")
   
   # Input arguments
   INPUT <- object$Methods
@@ -524,20 +640,14 @@ UVA.methods.section <- function (object)
   type <- INPUT$type
   sig <- INPUT$sig
   reduce <- INPUT$reduce
-  if(reduce){
-    
-    reduce.method <- INPUT$reduce.method
-    
-    if(reduce.method == "latent"){lavaan.args <- lavaan.args}
-    
-  }
-  adhoc <- INPUT$adhoc
+  auto <- INPUT$auto
+  if(isTRUE(reduce)){reduce.method <- INPUT$reduce.method}
   
   # Association description
   assoc <- switch(method,
                   "cor" = "zero-order correlations between all variables were computed. ",
                   "pcor" = "partial correlations between two variables given all others were computed. ",
-                  "wto" = "weighted topological overlap (Nowick, Gernat, Almaas, & Stubbs, 2009; Zhang & Horvath, 2005) was computed. Weighted topological overlap is a network measure that determines the extent to which items in a network \"overlap\" by quantifying the similarity between a pair of variables' shared connections (e.g., weights, signs, quantity; see Christensen, Garrido, & Golino, 2020 for more details). "
+                  "wto" = "weighted topological overlap (Nowick, Gernat, Almaas, & Stubbs, 2009; Zhang & Horvath, 2005) was computed. Weighted topological overlap is a network measure that determines the extent to which nodes in a network \"overlap\" by quantifying the similarity between a pair of variables' shared connections (e.g., weights, signs, quantity; see Christensen, Garrido, & Golino, 2021 for more details). "
   )
   
   # References
@@ -546,26 +656,120 @@ UVA.methods.section <- function (object)
   # Set up text
   ## Introduction
   intro.header <- "# Unique Variable Analysis"
+  
   intro.text <- paste("&emsp;Unique Variable Analysis (UVA) is a recently developed technique ",
-                      "to determine whether redundant variables exist in a dataset ",
-                      "(Christensen, Garrido, & Golino, 2020). UVA follows one of two approaches that ",
-                      "are based on a pairwise association measure. In this study, ", assoc,
-                      "The first approach is to estimate an empirical distribution from the absolute ",
-                      "non-zero association values; the second approach is to simply apply a threshold. ",
-                      "In this study, ", ifelse(type == "threshold",
-                                                "a thresold was used.",
-                                                "an empirical distribution was estimated. "),
+                      "to detect whether there are redundant variables in multivariate data ",
+                      "(Christensen, Garrido, & Golino, 2021). There are couple reasons to reduce redundancy ",
+                      "in data. First, as Christensen and colleagues (2021) demonstrate, redundant variables ",
+                      "can create minor factors (or correlated residuals; Montoya & Edwards, 2020), which lead ",
+                      "to *over factoring* or the overestimation of the number of factors in the data. Further, ",
+                      "in latent variable models (e.g., item response theory), redundant variables can lead to ",
+                      "violations of the local independence assumption (Embretson & Reise, 2000). Second, ",
+                      "redundant variables can influence the accurate and valid estimation of network measures ",
+                      "(Hallquist, Wright, & Molenaar, 2019). Specifically, redundant nodes in a network are ",
+                      "likely to have higher node strength values (absolute sum of a node's connections) ",
+                      "due to redundancy rather than actual increased connectivity to other nodes. ",
                       sep = "")
   
-  
-  refs$christensenB2020 <- paste("Christensen, A. P., Garrido, L. E., & Golino, H. (2020).",
+  refs$christensenB2020 <- paste("Christensen, A. P., Garrido, L. E., & Golino, H. (2021).",
                                  "Unique Variable Analysis: A novel approach for detecting redundant variables in multivariate data.",
                                  "<em>PsyArXiv</em>.",
                                  "https://doi.org/10.31234/osf.io/4kra2")
   
+  refs$embretson2013 <- paste("Embretson, S. E., & Reise, S. P. (2000).",
+                              "<em>Item response theory for psychologists</em>.",
+                              "Mahwah, NJ: Lawrence Erlbaum.")
+  
+  refs$hallquist2019 <- paste("Hallquist, M., Wright, A. C. G., & Molenaar, P. C. M. (2019).",
+                              "Problems with centrality measures in psychopathology symptom networks: Why network psychometrics cannot escape psychometric theory.",
+                              "<em>Multivariate Behavioral Research</em>.",
+                              "https://doi.org/10.1080/00273171.2019.1640103")
+  
+  refs$montoya2020 <- paste("Montoya, A. K., & Edwards, M. C. (2020).",
+                            "The poor fit of model fit for selecting number of factors in exploratory factor analysis for scale evaluation.",
+                            "<em>Educational and Psychological Measurement</em>, <em>81</em>(3), 413--440.",
+                            "https://doi.org/10.1177/0013164420942899")
+  
+  ## Text based on type
+  if(method == "wto"){
+    
+    type.text <- paste("\n&emsp;UVA begins by first computing a pairwise association measure. In this study, ",
+                       assoc,
+                       "Next, using only the non-zero (absolute) weighted toplogical overlap values, ",
+                       sep = "")
+    
+    refs$nowick2009 <- paste("Nowick, K., Gernat, T., Almaas, E., & Stubbs, L. (2009).",
+                            "Differences in human and chimpanzee gene expression patterns define an evolving network of transcription factors in brain.",
+                            "<em>Proceedings of the National Academy of Sciences</em>, <em>106</em>(52), 22358-22363.",
+                            "https://doi.org/10.1073/pnas.0911376106")
+    
+    refs$zhang2005 <- paste("Zhang, Z., & Horvath, S. (2005).",
+                              "A general framework for weighted gene co-expression network analysis.",
+                              "<em>Statistical Applications in Genetics and Molecular Biology</em>, <em>4</em>(1), 17.",
+                              "https://doi.org/10.2202/1544-6115.1128")
+    
+  }else{
+    
+    type.text <- paste("\n&emsp;UVA begins by first computing a pairwise association measure. In this study, ",
+                       assoc,
+                       "Next, using only the non-zero (absolute) correlation values, ",
+                       sep = "")
+    
+  }
+  
+  ## Text based on automated procedure
+  if(isTRUE(auto)){
+    
+    type.text <- paste(type.text,
+                       "a threshold was applied, with values $\\ge$ ", sig, "suggesting that a pair of variables are redundant. ",
+                       "The automated procedure was followed where redundant variables were merged using a reflective latent variable model. ",
+                       "The procedure proceeded iteratively until no redundant variables remained (see Christensen, Garrido, & Golino, 2021 for more details). ",
+                       sep = "")
+    
+  }else{
+   
+    if(type == "threshold"){
+      
+      type.text <- paste(type.text,
+                         "a threshold was applied, with values $\\ge$ ", sig, "suggesting that a pair of variables are redundant. ",
+                         "After, UVA passes the redundancies onto us and we made the definitive decisions on whether variables were redundant ",
+                         "based on our theoretical knowledge about the relations between the variables. ",
+                         sep = "")
+      
+      
+    }else if(type == "adapt"){
+      
+      type.text <- paste(type.text,
+                         "an empirical distribution is estimated to obtain $p$-values (with significance $p$ ",
+                         "$\\le$ ", sig,"). Significant values suggest that a pair of variables are redundant. ",
+                         "Because there are many non-zero values (leading to multiple comparisons), an adjustment ",
+                         'to the $p$-value is necessary. We applied the default method that uses an "adaptive" alpha ',
+                         "(P&eacute;rez & Pericchi, 2014), which adjusts alpha based on sample size (here, the number of non-zero values; Christensen et al., 2020). ",
+                         "After, UVA passes the redundancies onto us and we made the definitive decisions on whether variables were redundant ",
+                         "based on our theoretical knowledge about the relations between the variables.",
+                         sep = "")
+      
+      refs$perez2014 <- paste("P&eacute;rez, M.-E., & Pericchi, L. R. (2014).",
+                              "Changing statistical significance with the amount of information: The adaptive $\\alpha$ significance level.",
+                              "<em>Statistics & Probability Letters</em>, <em>85</em>, 20-24.",
+                              "https://doi.org/10.1016/j.spl.2013.10.018")
+      
+    }else if(type == "alpha"){
+      
+      type.text <- paste(type.text,
+                         "an empirical distribution is estimated to obtain $p$-values (with significance $p$ ",
+                         "$\\le$ ", sig,". Significant values suggest that a pair of variables are redundant. ",
+                         "After, UVA passes the redundancies onto us and we made the definitive decisions on whether variables were redundant ",
+                         "based on our theoretical knowledge about the relations between the variables.",
+                         sep = "")
+      
+    }
+     
+  }
   
   # Organize text output
   markobj <- paste(intro.header, intro.text,
+                   type.text,
                    sep = "\n")
   
   # Return list
