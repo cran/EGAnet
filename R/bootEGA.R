@@ -95,7 +95,7 @@
 #'
 #' @param model.args List.
 #' A list of additional arguments for \code{\link[EGAnet]{EBICglasso.qgraph}}
-#' or \code{\link[NetworkToolbox]{TMFG}}
+#' or \code{\link[EGAnet]{TMFG}}
 #'
 #' @param algorithm A string indicating the algorithm to use or a function from \code{\link{igraph}}
 #' Current options are:
@@ -268,6 +268,9 @@ bootEGA <- function(data, n = NULL, uni.method = c("expand", "LE"), iter,
                     typicalStructure = TRUE, plot.typicalStructure = TRUE,
                     plot.type = c("GGally", "qgraph"),
                     plot.args = list(), ncores, ...) {
+  
+  # Make data a matrix
+  data <- as.matrix(data)
 
   #### DEPRECATED ARGUMENTS ####
 
@@ -435,7 +438,7 @@ bootEGA <- function(data, n = NULL, uni.method = c("expand", "LE"), iter,
     #generate data
     if(type == "parametric"){
 
-      datalist[[count]] <- MASS::mvrnorm(cases, mu = rep(0, ncol(cor.data)), Sigma = cor.data)
+      datalist[[count]] <- MASS_mvrnorm(cases, mu = rep(0, ncol(cor.data)), Sigma = cor.data)
 
     }else if(type == "resampling"){
 
@@ -454,12 +457,12 @@ bootEGA <- function(data, n = NULL, uni.method = c("expand", "LE"), iter,
   #Parallel processing
   cl <- parallel::makeCluster(ncores)
 
-  #Export variables
-  parallel::clusterExport(cl = cl,
-                          varlist = c("datalist", "uni.method", "cases", "corr",
-                                      "model", "model.args",
-                                      "algorithm", "algorithm.args"),
-                          envir=environment())
+  # #Export variables
+  # parallel::clusterExport(cl = cl,
+  #                         varlist = c("datalist", "uni.method", "cases", "corr",
+  #                                     "model", "model.args",
+  #                                     "algorithm", "algorithm.args"),
+  #                         envir=environment())
 
   #let user know data generation has started
   message("Estimating EGA networks...\n", appendLF = FALSE)

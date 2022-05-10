@@ -2,7 +2,7 @@
 #'
 #' Estimates the number of dimensions of a given dataset or correlation matrix
 #' using the graphical lasso (\code{\link{EBICglasso.qgraph}}) or the
-#' Triangulated Maximally Filtered Graph (\code{\link[NetworkToolbox]{TMFG}})
+#' Triangulated Maximally Filtered Graph (\code{\link[EGAnet]{TMFG}})
 #' network estimation methods.
 #'
 #' Two community detection algorithms, Walktrap (Pons & Latapy, 2006) and
@@ -79,7 +79,7 @@
 #'
 #' @param model.args List.
 #' A list of additional arguments for \code{\link[EGAnet]{EBICglasso.qgraph}}
-#' or \code{\link[NetworkToolbox]{TMFG}}
+#' or \code{\link[EGAnet]{TMFG}}
 #'
 #' @param algorithm A string indicating the algorithm to use or a function from \code{\link{igraph}}
 #' Defaults to \code{"walktrap"}.
@@ -91,7 +91,7 @@
 #' {Computes the Walktrap algorithm using \code{\link[igraph]{cluster_walktrap}}}
 #'
 #' \item{\strong{\code{louvain}}}
-#' {Computes the Walktrap algorithm using \code{\link[igraph]{cluster_louvain}}}
+#' {Computes the Louvain algorithm using \code{\link[igraph]{cluster_louvain}}}
 #'
 #' }
 #'
@@ -159,7 +159,7 @@
 #' @return Returns a list containing:
 #'
 #' \item{network}{A symmetric network estimated using either the
-#' \code{\link{EBICglasso.qgraph}} or \code{\link[NetworkToolbox]{TMFG}}}
+#' \code{\link{EBICglasso.qgraph}} or \code{\link[EGAnet]{TMFG}}}
 #'
 #' \item{wc}{A vector representing the community (dimension) membership
 #' of each node in the network. \code{NA} values mean that the node
@@ -242,7 +242,7 @@
 #'
 #' @export
 #'
-# Updated 12.05.2021
+# Updated 30.12.2021
 # LE adjustment 08.03.2021
 ## EGA Function to detect unidimensionality:
 EGA <- function (data, n = NULL, uni.method = c("expand", "LE"),
@@ -360,6 +360,9 @@ EGA <- function (data, n = NULL, uni.method = c("expand", "LE"),
     if(is.null(colnames(data))){
       colnames(data) <- paste("V", 1:ncol(data), sep = "")
     }
+    
+    # Force row names to be column names
+    row.names(data) <- colnames(data)
 
     # Check for number of cases
     if(missing(n)){
@@ -383,7 +386,7 @@ EGA <- function (data, n = NULL, uni.method = c("expand", "LE"),
         if("spins" %in% methods::formalArgs(algorithm)){
           
           # Generate data
-          uni.data <- MASS::mvrnorm(n = n, mu = rep(0, ncol(data)), Sigma = data)
+          uni.data <- MASS_mvrnorm(n = n, mu = rep(0, ncol(data)), Sigma = data)
           
           # Simulate data from unidimensional factor model
           sim.data <- sim.func(data = uni.data, nvar = 4, nfact = 1, load = .70)
@@ -436,7 +439,16 @@ EGA <- function (data, n = NULL, uni.method = c("expand", "LE"),
     }else if(uni.method == "LE"){
       
       # Leading eigenvalue approach for one and two dimensions
-      wc <- igraph::cluster_leading_eigen(NetworkToolbox::convert2igraph(abs(data)))$membership
+      wc <- try(
+        igraph::cluster_leading_eigen(convert2igraph(abs(data)))$membership,
+        silent = TRUE
+      )
+      
+      if(any(class(wc) == "try-error")){
+        wc <- igraph::cluster_louvain(convert2igraph(abs(data)))$membership
+        warning("Error occurred in Leading Eigenvalue algorithm. Using Louvain for unidimensional check")
+      }
+      
       names(wc) <- colnames(data)
       n.dim <- length(na.omit(unique(wc)))
       
@@ -570,7 +582,16 @@ EGA <- function (data, n = NULL, uni.method = c("expand", "LE"),
       )
       
       # Leading eigenvalue approach for one and two dimensions
-      wc <- igraph::cluster_leading_eigen(NetworkToolbox::convert2igraph(abs(cor.data)))$membership
+      wc <- try(
+        igraph::cluster_leading_eigen(convert2igraph(abs(cor.data)))$membership,
+        silent = TRUE
+      )
+      
+      if(any(class(wc) == "try-error")){
+        wc <- igraph::cluster_louvain(convert2igraph(abs(cor.data)))$membership
+        warning("Error occurred in Leading Eigenvalue algorithm. Using Louvain for unidimensional check")
+      }
+  
       names(wc) <- colnames(cor.data)
       n.dim <- length(na.omit(unique(wc)))
       
@@ -663,8 +684,8 @@ EGA <- function (data, n = NULL, uni.method = c("expand", "LE"),
   args$corr <- corr
 
   ## Check if glasso was used
-  if(model == "glasso")
-  {
+  if(model == "glasso"){
+    
     args$gamma <- gamma
     args$lambda <- lambda
   }

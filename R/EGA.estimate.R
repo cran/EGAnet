@@ -2,7 +2,7 @@
 #'
 #' Estimates the number of dimensions of a given dataset or correlation matrix
 #' using the graphical lasso (\code{\link{EBICglasso.qgraph}}) or the
-#' Triangulated Maximally Filtered Graph (\code{\link[NetworkToolbox]{TMFG}})
+#' Triangulated Maximally Filtered Graph (\code{\link[EGAnet]{TMFG}})
 #' network estimation methods.
 #'
 #' Two community detection algorithms, Walktrap (Pons & Latapy, 2006) and
@@ -39,7 +39,7 @@
 #'
 #' @param model.args List.
 #' A list of additional arguments for \code{\link[EGAnet]{EBICglasso.qgraph}}
-#' or \code{\link[NetworkToolbox]{TMFG}}
+#' or \code{\link[EGAnet]{TMFG}}
 #'
 #' @param algorithm A string indicating the algorithm to use or a function from \code{\link{igraph}}
 #' Current options are:
@@ -89,7 +89,7 @@
 #' @return Returns a list containing:
 #'
 #' \item{estimated.network}{A symmetric network estimated using either the
-#' \code{\link{EBICglasso.qgraph}} or \code{\link[NetworkToolbox]{TMFG}}}
+#' \code{\link{EBICglasso.qgraph}} or \code{\link[EGAnet]{TMFG}}}
 #'
 #' \item{wc}{A vector representing the community (dimension) membership
 #' of each node in the network. \code{NA} values mean that the node
@@ -157,7 +157,7 @@
 #' @export
 #'
 # Estimates EGA
-# Updated 16.06.2021
+# Updated 19.04.2022
 EGA.estimate <- function(data, n = NULL,
                          model = c("glasso", "TMFG"), model.args = list(),
                          algorithm = c("walktrap", "louvain"), algorithm.args = list(),
@@ -167,7 +167,7 @@ EGA.estimate <- function(data, n = NULL,
 {
   # Make the data a matrix
   data <- as.matrix(data)
-  
+
   # Get additional arguments
   add.args <- list(...)
 
@@ -208,7 +208,7 @@ EGA.estimate <- function(data, n = NULL,
   ## Check for model
   if(model == "glasso"){
     model.formals <- formals(EBICglasso.qgraph)
-  }else{model.formals <- formals(NetworkToolbox::TMFG)}
+  }else{model.formals <- formals(TMFG)}
 
   ## Check for input model arguments
   if(length(model.args) != 0){
@@ -292,42 +292,42 @@ EGA.estimate <- function(data, n = NULL,
 
     # Check if symmetric (time series data)
     if(!isSymmetric(data)){
-      
+
       # Obtain n
       n <- nrow(data)
-      
+
       # Compute correlation matrix
       cor.data <- switch(corr,
                          cor_auto = qgraph::cor_auto(data, forcePD = TRUE),
                          pearson = cor(data, use = "pairwise.complete.obs", method = "pearson"),
                          spearman = cor(data, use = "pairwise.complete.obs", method = "spearman")
       )
-      
+
       # Check if positive definite
       if(any(eigen(cor.data)$values < 0)){
-        
+
         # Let user know
         warning("Correlation matrix is not positive definite.\nForcing positive definite matrix using Matrix::nearPD()\nResults may be unreliable")
-        
+
         # Force positive definite matrix
         cor.data <- as.matrix(Matrix::nearPD(cor.data, corr = TRUE, keepDiag = TRUE, ensureSymmetry = TRUE)$mat)
-        
+
       }
     }else{
-      
+
       # Check if positive definite
       if(any(eigen(data)$values < 0)){
-        
+
         # Let user know
         warning("Correlation matrix is not positive definite.\nForcing positive definite matrix using Matrix::nearPD()\nResults may be unreliable")
-        
+
         # Force positive definite matrix
         cor.data <- as.matrix(Matrix::nearPD(data, corr = TRUE, keepDiag = TRUE, ensureSymmetry = TRUE)$mat)
-        
+
       }else{cor.data <- data}
-      
+
     }
-    
+
   }
 
   #### ADDITIONAL ARGUMENTS HANDLING ####
@@ -338,8 +338,8 @@ EGA.estimate <- function(data, n = NULL,
   #### ADDITIONAL ARGUMENTS HANDLING ####
 
   # Estimate network
-  if(model == "glasso")
-  {
+  if(model == "glasso"){
+    
     # GLASSO additional arguments
     ## Lambda
     if(!"lambda.min.ratio" %in% names(model.args)){
@@ -358,7 +358,7 @@ EGA.estimate <- function(data, n = NULL,
       # Estimate network
       estimated.network <- do.call(EBICglasso.qgraph, model.formals)
 
-      if(all(abs(NetworkToolbox::strength(estimated.network))>0)){
+      if(all(abs(strength(estimated.network))>0)){
 
         if(verbose){
 
@@ -375,33 +375,35 @@ EGA.estimate <- function(data, n = NULL,
     }
 
   }else if(model == "TMFG"){
-    estimated.network <- NetworkToolbox::TMFG(cor.data)$A
+    estimated.network <- TMFG(cor.data)$A
+    colnames(estimated.network) <- colnames(cor.data)
+    rownames(estimated.network) <- rownames(cor.data)
   }
 
   # Check for unconnected nodes
-  if(all(NetworkToolbox::degree(estimated.network)==0)){
+  if(all(degree(estimated.network)==0)){
 
     # Initialize community membership list
     wc <- list()
     wc$membership <- rep(NA, ncol(estimated.network))
     warning("Estimated network contains unconnected nodes:\n",
-            paste(names(which(NetworkToolbox::strength(estimated.network)==0)), collapse = ", "))
+            paste(names(which(strength(estimated.network)==0)), collapse = ", "))
 
-    unconnected <- which(NetworkToolbox::degree(estimated.network)==0)
+    unconnected <- which(degree(estimated.network)==0)
 
   }else{
 
-    if(any(NetworkToolbox::degree(estimated.network)==0)){
+    if(any(degree(estimated.network)==0)){
 
       warning("Estimated network contains unconnected nodes:\n",
-              paste(names(which(NetworkToolbox::strength(estimated.network)==0)), collapse = ", "))
+              paste(names(which(strength(estimated.network)==0)), collapse = ", "))
 
-      unconnected <- which(NetworkToolbox::degree(estimated.network)==0)
+      unconnected <- which(degree(estimated.network)==0)
 
     }
 
     # Convert to igraph
-    graph <- suppressWarnings(NetworkToolbox::convert2igraph(abs(estimated.network)))
+    graph <- suppressWarnings(convert2igraph(abs(estimated.network)))
 
     # Run community detection algorithm
     algorithm.formals$graph <- graph
@@ -416,9 +418,23 @@ EGA.estimate <- function(data, n = NULL,
     }else{wc <- do.call(what = algorithm, args = as.list(algorithm.formals))}
 
   }
+  
+  # Check for lower-order Louvain argument
+  if("lower.louvain" %in% names(add.args)){
+    
+    # Check for TRUE
+    if(isTRUE(add.args$lower.louvain)){
+      wc <- wc$memberships[1,] # lowest level of communities
+    }
+    
+  }else{
+    
+    # Obtain community memberships
+    wc <- wc$membership
+    
+  }
 
-  # Obtain community memberships
-  wc <- wc$membership
+  # Set up missing memberships
   init.wc <- as.vector(matrix(NA, nrow = 1, ncol = ncol(data)))
   init.wc[1:length(wc)] <- wc
   wc <- init.wc
@@ -427,7 +443,7 @@ EGA.estimate <- function(data, n = NULL,
   if(exists("unconnected")){
     wc[unconnected] <- NA
   }
-  
+
   # Convert numbers to be consecutive
   uniq.wc <- unique(na.omit(wc))
   wc.ord <- sort(uniq.wc)

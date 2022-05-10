@@ -7,6 +7,8 @@
 \alias{print.dynEGA.Individuals}
 \alias{print.EGA}
 \alias{print.NetLoads}
+\alias{print.invariance}
+\alias{print.hierEGA}
 \title{S3Methods for Printing}
 \usage{
 \method{print}{dynEGA}(x,  ...)
@@ -18,6 +20,10 @@
 \method{print}{EGA}(x,  ...)
 
 \method{print}{NetLoads}(x, ...)
+
+\method{print}{invariance}(x, ...)
+
+\method{print}{hierEGA}(x, ...)
 }
 \arguments{
 \item{x}{Object from \code{EGAnet} package}
