@@ -9,16 +9,14 @@ hierEGA(
   scores = c("factor", "network"),
   consensus.iter = 1000,
   consensus.method = c("highest_modularity", "most_common", "iterative", "lowest_tefi"),
-  uni.method = c("expand", "LE"),
+  uni.method = c("expand", "LE", "louvain"),
   corr = c("cor_auto", "pearson", "spearman"),
   model = c("glasso", "TMFG"),
   model.args = list(),
-  algorithm = c("walktrap", "louvain"),
+  algorithm = c("walktrap", "leiden", "louvain"),
   algorithm.args = list(),
   plot.EGA = TRUE,
-  plot.type = c("GGally", "qgraph"),
-  plot.args = list(),
-  verbose = TRUE
+  plot.args = list()
 )
 }
 \arguments{
@@ -49,7 +47,7 @@ Number of iterations to perform in consensus clustering
 Defaults to \code{1000}}
 
 \item{consensus.method}{Character.
-What consensus clustering method should be used? 
+What consensus clustering method should be used?
 Defaults to \code{"highest_modularity"}.
 Current options are:
 
@@ -96,11 +94,17 @@ expansion is used. This is the method used in the Golino et al. (2020)
 \emph{Psychological Methods} simulation.}
 
 \item{\strong{\code{LE}}}
-{Applies the leading eigenvalue algorithm (\code{\link[igraph]{cluster_leading_eigen}})
+{Applies the Leading Eigenvalue algorithm (\code{\link[igraph]{cluster_leading_eigen}})
 on the empirical correlation matrix. If the number of dimensions is 1,
-then the leading eigenvalue solution is used; otherwise, regular EGA
+then the Leading Eigenvalue solution is used; otherwise, regular EGA
 is used. This is the final method used in the Christensen, Garrido,
 and Golino (2021) simulation.}
+
+\item{\strong{\code{louvain}}}
+{Applies the Louvain algorithm (\code{\link[igraph]{cluster_louvain}})
+on the empirical correlation matrix using a resolution parameter = 0.95.
+If the number of dimensions is 1, then the Louvain solution is used; otherwise,
+regular EGA is used. This method was validated in the Christensen (2022) simulation.}
 
 }}
 
@@ -140,16 +144,20 @@ extended Bayesian information criterion to select optimal regularization paramet
 
 \item{model.args}{List.
 A list of additional arguments for \code{\link[EGAnet]{EBICglasso.qgraph}}
-or \code{\link[NetworkToolbox]{TMFG}}}
+or \code{TMFG}}
 
 \item{algorithm}{A string indicating the algorithm to use or a function from \code{\link{igraph}}
-Defaults to \code{"louvain"}.
+Defaults to \code{"walktrap"}.
 Current options are:
 
 \itemize{
 
 \item{\strong{\code{walktrap}}}
 {Computes the Walktrap algorithm using \code{\link[igraph]{cluster_walktrap}}}
+
+\item{\strong{\code{leiden}}}
+{Computes the Leiden algorithm using \code{\link[igraph]{cluster_leiden}}.
+Defaults to \code{objective_function = "modularity"}}
 
 \item{\strong{\code{louvain}}}
 {Computes the Louvain algorithm using \code{\link[igraph]{cluster_louvain}}}
@@ -164,23 +172,9 @@ or some other community detection algorithm function (see examples)}
 If \code{TRUE}, returns a plot of the network and its estimated dimensions.
 Defaults to \code{TRUE}}
 
-\item{plot.type}{Character.
-Plot system to use.
-Current options are \code{\link[qgraph]{qgraph}} and \code{\link{GGally}}.
-Defaults to \code{"GGally"}}
-
 \item{plot.args}{List.
-A list of additional arguments for the network plot.
-For \code{plot.type = "qgraph"}:
-
-\itemize{
-
-\item{\strong{\code{vsize}}}
-{Size of the nodes. Defaults to 6.}
-
-}
-For \code{plot.type = "GGally"} (see \code{\link[GGally]{ggnet2}} for
-full list of arguments):
+A list of additional arguments for the network plot. See \code{\link[GGally]{ggnet2}} for
+full list of arguments:
 
 \itemize{
 
@@ -206,11 +200,6 @@ See \code{\link[EGAnet]{color_palette_EGA}} for
 more details and examples}
 
 }}
-
-\item{verbose}{Boolean.
-Should network estimation parameters be printed?
-Defaults to \code{TRUE}.
-Set to \code{FALSE} for no print out}
 }
 \value{
 Returns a list of lists containing: \cr
@@ -273,7 +262,7 @@ across the \code{\link[igraph]{cluster_louvain}} applications}
 columns indicate: number of dimensions (\code{N_Dimensions}),
 proportion of times each community solution was identified (\code{Proportion}),
 modularity of each community solution (\code{Modularity}),
-total entropy fit index of each community solution (\code{\link[EGAnet]{tefi}}), 
+total entropy fit index of each community solution (\code{\link[EGAnet]{tefi}}),
 and the memberships for each item. Across the rows indicate each
 unique community solution
 }
@@ -297,32 +286,12 @@ estimate factor or network scores, which are used to estimate the higher-order d
 # Obtain example data
 data <- optimism
 
-# hierEGA example (no plots)
+\donttest{# hierEGA example
 opt.hier<- hierEGA(
   data = optimism,
   algorithm = "louvain",
   plot.EGA = FALSE # no plots for CRAN check
-)
-
-\dontrun{
-
-# hierEGA example (plots)
-opt.hier <- hierEGA(
-  data = optimism,
-  algorithm = "louvain"
-)
-
-# Save plots
-ggplot2::ggsave(
-  filename = "hierEGA_plot.png", # name of plot
-  plot = opt.res$hierarchical$hier_plot, # plot to save
-  height = 8, # figure height
-  width = 10, # figure width
-  dpi = 600 # dots per inch
-)
-
-}
-
+)}
 
 }
 \references{
@@ -334,7 +303,7 @@ Consensus clustering in complex networks.
 Marcos Jimenez <marcosjnezhquez@gmailcom>,
 Francisco J. Abad <fjose.abad@uam.es>,
 Eduardo Garcia-Garzon <egarcia@ucjc.edu>,
-Luis Eduardo Garrido <luisgarrido@pucmm.edu.do>,
+Hudson Golino <hfg9s@virginia.edu>,
 Alexander P. Christensen <alexpaulchristensen@gmail.com>, and
-Hudson Golino <hfg9s at virginia.edu>
+Luis Eduardo Garrido <luisgarrido@pucmm.edu.do>
 }

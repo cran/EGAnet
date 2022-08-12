@@ -6,23 +6,22 @@
 \usage{
 compare.EGA.plots(
   ...,
-  input_list = NULL,
-  base_plot = 1,
+  input.list = NULL,
+  base.plot = 1,
   labels,
   rows,
   columns,
-  plot.type = c("GGally", "qgraph"),
   plot.args = list()
 )
 }
 \arguments{
 \item{...}{\code{\link{EGAnet}} objects}
 
-\item{input_list}{List.
+\item{input.list}{List.
 Bypasses \code{...} argument in favor of using a list
 as an input}
 
-\item{base_plot}{Numeric.
+\item{base.plot}{Numeric.
 Plot to be used as the base for the configuration of the networks.
 Uses the number of the order in which the plots are input.
 Defaults to \code{1} or the first plot}
@@ -36,11 +35,6 @@ Number of rows to spread plots across}
 \item{columns}{Numeric.
 Number of columns to spread plots down}
 
-\item{plot.type}{Character.
-Plot system to use.
-Current options are \code{\link[qgraph]{qgraph}} and \code{\link{GGally}}.
-Defaults to \code{"GGally"}}
-
 \item{plot.args}{List.
 A list of additional arguments for the network plot.
 For \code{plot.type = "qgraph"}:
@@ -51,7 +45,8 @@ For \code{plot.type = "qgraph"}:
 {Size of the nodes. Defaults to 6.}
 
 }
-For \code{plot.type = "GGally"} (see \code{\link[GGally]{ggnet2}} for
+
+(see \code{\link[GGally]{ggnet2}} for
 full list of arguments):
 
 \itemize{
@@ -88,8 +83,24 @@ placed in the same layout to maximize comparison. Community memberships
 are also homogenized across EGA outputs to enhance interpretation
 }
 \examples{
-# obtain SAPA items
+# Obtain SAPA items
 items <- psychTools::spi[,c(11:20)]
+
+# Draw random samples
+sample1 <- items[sample(1:nrow(items), 1000),]
+sample2 <- items[sample(1:nrow(items), 1000),]
+
+\donttest{# Estimate EGAs
+ega1 <- EGA(sample1)
+ega2 <- EGA(sample2)
+
+# Compare EGAs via plot
+compare.EGA.plots(
+  ega1, ega2,
+  base.plot = 1, # use "ega1" as base for comparison
+  labels = c("Sample 1", "Sample 2"),
+  rows = 1, columns = 2
+)}
 
 }
 \author{

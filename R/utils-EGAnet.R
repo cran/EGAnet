@@ -89,11 +89,13 @@ poly.irt <- function(loadings, data)
 # Main Louvain step-wise function
 #' @noRd
 # Louvain Communities
-# Updated 06.05.2022
+# Updated 25.07.2022
 louvain_communities <- function(
     newA,
     method,
     resolution,
+    Q_matrix,
+    original_Q_matrix,
     corr,
     original_A = NULL,
     previous_communities = NULL,
@@ -208,14 +210,27 @@ louvain_communities <- function(
 
             # Compute gain
             if(method == "modularity"){
-              gain_vector[neighbor_community] <- modularity( # new modularity
-                new_communities,
-                newA, resolution = resolution
-              ) -
-                modularity( # old modularity
-                  communities,
-                  newA, resolution = resolution
+              gain_vector[neighbor_community] <- 
+                quick_modularity( # new modularity
+                  communities = new_communities,
+                  A = newA,
+                  Q_matrix = Q_matrix
+                ) -
+                quick_modularity( # old modularity
+                  communities = communities,
+                  A = newA,
+                  Q_matrix = Q_matrix
                 )
+                
+              #   modularity( # new modularity
+              #   new_communities,
+              #   newA, resolution = resolution
+              # ) -
+              #   modularity( # old modularity
+              #     communities,
+              #     newA, resolution = resolution
+              #   )
+                
             }else if(method == "tefi"){
 
               # Reverse order (lower is better)
@@ -280,11 +295,17 @@ louvain_communities <- function(
         if(method == "modularity"){
 
           # Higher values are better
-          improve_modularity <- modularity(
+          improve_modularity <- quick_modularity(
             communities = improve_communities,
             A = original_A,
-            resolution = resolution
+            Q_matrix = original_Q_matrix
           )
+          
+          # quick_modularity(
+          #   communities = improve_communities,
+          #   A = original_A,
+          #   resolution = resolution
+          # )
 
           # Check for update
           if(improve_modularity > previous_modularity){
@@ -344,7 +365,12 @@ louvain_communities <- function(
       }
 
       # Obtain modularity
-      Q <- modularity(update_communities, original_A, resolution)
+      # Q <- modularity(update_communities, original_A, resolution)
+      Q <- quick_modularity(
+        communities = update_communities,
+        A = original_A,
+        Q_matrix = original_Q_matrix
+      )
 
       # Obtain new higher order
       newA <- make_higher_order(original_A, update_communities)
@@ -372,6 +398,12 @@ louvain_communities <- function(
       # Reset previous communities and modularity
       previous_communities <- update_communities
       previous_modularity <- update_modularity
+      
+      # Update modularity matrix
+      Q_matrix <- modularity_matrix(
+        A = newA,
+        resolution = resolution
+      )
 
       # Check if gain equals zero
       if(gain == 0){
@@ -382,7 +414,12 @@ louvain_communities <- function(
     }else{
 
       if(method == "modularity"){
-        Q <- modularity(communities, newA, resolution)
+        # Q <- modularity(communities, newA, resolution)
+        Q <- quick_modularity(
+          communities = communities,
+          A = newA,
+          Q_matrix = Q_matrix
+        )
       }else if(method == "tefi"){
         Q <- tefi(corr, communities)$VN.Entropy.Fit
       }
@@ -409,10 +446,16 @@ louvain_communities <- function(
 # Modularity function
 #' @noRd
 # Modularity
-# Updated 06.05.2022
+# Updated 23.07.2022
 modularity <- function(communities, A, resolution)
 {
 
+  # Convert to matrix
+  A <- as.matrix(A)
+  
+  # Ensure absolute
+  A <- abs(A)
+  
   # Obtain total sum
   total <- sum(A)
 
@@ -427,7 +470,7 @@ modularity <- function(communities, A, resolution)
 
   # Obtain modularity matrix
   Q_matrix <- A - resolution * (strength %*% t(strength)) / total
-
+  
   # Keep values within communities
   ## Initialize within matrix
   init_within <- matrix(
@@ -450,41 +493,87 @@ modularity <- function(communities, A, resolution)
   # Compute modularity
   Q <- sum(Q_within * Q_matrix / total)
 
-
-  # # Loop through communities
-  # for(i in 1:length(unique_comm)){
-  #
-  #   # Find target nodes
-  #   target_nodes <- which(communities == unique_comm[i])
-  #
-  #   # Get strength within
-  #   within_strength <- sum(A[target_nodes, target_nodes])
-  #
-  #   # Get total strength
-  #   total_strength <- sum(A[target_nodes,])
-  #
-  #   # Ensure there are connections
-  #   if(total_strength > 0){
-  #
-  #     Q <- Q +
-  #       (within_strength / total) -
-  #       (total_strength / total)^2
-  #
-  #   }
-  #
-  #
-  # }
-
   return(Q)
 
+}
+
+# Modularity matrix (for quick_modularity)
+#' @noRd
+# Modularity matrix
+# Updated 25.07.2022
+modularity_matrix <- function(A, resolution)
+{
+  
+  # Convert to matrix
+  A <- as.matrix(A)
+  
+  # Ensure absolute
+  A <- abs(A)
+  
+  # Obtain total sum
+  total <- sum(A)
+  
+  # Obtain strength
+  strength <- colSums(A)
+  
+  # Obtain modularity matrix
+  Q_matrix <- A - resolution * (strength %*% t(strength)) / total
+
+  return(Q_matrix)
+  
+}
+
+# Quick modularity
+#' @noRd
+# Quicker modularity
+# (skips computation of modularity matrix each time)
+# Updated 25.07.2022
+quick_modularity <- function(communities, A, Q_matrix)
+{
+  
+  # Total strength of network
+  total <- sum(abs(as.matrix(A)))
+  
+  # Keep values within communities
+  ## Initialize within matrix
+  init_within <- matrix(
+    rep(communities, times = ncol(A)),
+    byrow = TRUE, nrow = nrow(A),
+    ncol = ncol(A)
+  )
+  
+  ## Create within matrix
+  within_matrix <- !sweep(
+    init_within,
+    MARGIN = 1,
+    STATS = communities,
+    FUN = "-"
+  )
+  
+  ## Obtain Q matrix
+  Q_within <- apply(within_matrix, 2, as.numeric)
+  
+  # Compute modularity
+  Q <- sum(Q_within * Q_matrix / total)
+  
+  return(Q)
+  
 }
 
 # Collapses Louvain nodes into "latent" nodes
 #' @noRd
 # Higher order Louvain
-# Updated 06.05.2022
-make_higher_order <- function(A, current_communities)
+# Updated 07.08.2022
+make_higher_order <- function(
+    A, current_communities,
+    method = c("sum", "mean")
+)
 {
+  
+  # Missing
+  if(missing(method)){
+    method <- "sum"
+  }
 
   # Get number of nodes
   n_higher <- ncol(A)
@@ -536,9 +625,15 @@ make_higher_order <- function(A, current_communities)
       ind2 <- community_current[j,]
 
       # Update adjacency matrix
-      newA[i,j] <- sum(
-        A[ind1[ind1 > 0], ind2[ind2 > 0]]
-      )
+      if(method == "sum"){
+        newA[i,j] <- sum(
+          A[ind1[ind1 > 0], ind2[ind2 > 0]]
+        )
+      }else if(method == "mean"){
+        newA[i,j] <- mean(
+          A[ind1[ind1 > 0], ind2[ind2 > 0]]
+        )
+      }
       newA[j,i] <- newA[i,j]
 
     }
@@ -577,37 +672,84 @@ reindex_comm <- function(communities)
 # Lancichinetti & Fortunato (2012)
 #' @noRd
 # Consensus Clustering
-# Updated 08.05.2022
+# Updated 22.07.2022
 consensus_clustering <- function(
     network, corr,
     order = c("lower", "higher"),
-    consensus.iter
+    consensus.iter,
+    resolution = 1
 )
 {
-
+  
   # Obtain network names
   network_names <- colnames(network)
+  
+  # Check for empty network
+  if(sum(network) == 0){
+    
+    # Return individual communities
+    wc <- 1:ncol(network)
+    
+    # Assign names
+    names(wc) <- network_names
+    
+    # Set up results
+    results <- list()
+    results$highest_modularity <- wc
+    results$most_common <- wc
+    results$iterative <- wc
+    results$lowest_tefi <- wc
+    results$summary_table <- "Empty network. No general factors found."
+    
+    # Return consensus
+    return(results)
+    
+    
+  }
 
   # Convert network to igraph
-  igraph_network <- convert2igraph(abs(network))
+  igraph_network <- suppressWarnings(
+    convert2igraph(abs(network))
+  )
+  
+  # Ensure all nodes are included in igraph
+  if(igraph::vcount(igraph_network) != ncol(network)){
+    
+    igraph_network <- igraph::add.vertices(
+      igraph_network,
+      nv = ncol(network) -
+        igraph::vcount(igraph_network)
+    )
+    
+  }
 
   # Apply Louvain
-  communities <- lapply(1:consensus.iter, function(j){
+  communities <- lapply(1:consensus.iter, function(j, resolution){
 
+    # igraph output
+    output <- igraph::cluster_louvain(igraph_network, resolution = resolution)
+    
     # Obtain memberships
-    wc <- igraph::cluster_louvain(igraph_network)$memberships
-
-    # Obtain order
-    if(order == "lower"){
-      wc <- wc[1,]
-    }else if(order == "higher"){
-      wc <- wc[nrow(wc),]
+    wc <- output$memberships
+    
+    # Check for no rows
+    if(nrow(wc) == 0){
+      wc <- output$membership
+    }else{
+      
+      # Obtain order
+      if(order == "lower"){
+        wc <- wc[1,]
+      }else if(order == "higher"){
+        wc <- wc[nrow(wc),]
+      }
+      
     }
 
     # Return
     return(wc)
 
-  })
+  }, resolution = resolution)
 
   # Simplify to a matrix
   wc_matrix <- t(simplify2array(communities, higher = FALSE))
@@ -680,9 +822,6 @@ consensus_clustering <- function(
 
   # Traditional consensus clustering
 
-  # Initialize D matrix
-  d_matrix <- matrix(0, nrow = ncol(network), ncol = ncol(network))
-
   # Binary check function
   binary <- function(b_matrix){
     all(b_matrix == 0 | b_matrix == 1)
@@ -698,35 +837,67 @@ consensus_clustering <- function(
 
       # Convert network to igraph
       igraph_network <- convert2igraph(abs(network))
+      
+      # Ensure all nodes are included in igraph
+      if(igraph::vcount(igraph_network) != ncol(network)){
+        
+        igraph_network <- igraph::add.vertices(
+          igraph_network,
+          nv = ncol(network) -
+            igraph::vcount(igraph_network)
+        )
+        
+      }
 
       # Apply Louvain
-      communities <- lapply(1:consensus.iter, function(j){
+      communities <- lapply(1:consensus.iter, function(j, resolution){
 
+        # igraph output
+        output <- igraph::cluster_louvain(igraph_network, resolution = resolution)
+        
         # Obtain memberships
-        wc <- igraph::cluster_louvain(igraph_network)$memberships
-
-        # Obtain order
-        if(order == "lower"){
-          wc <- wc[1,]
-        }else if(order == "higher"){
-          wc <- wc[nrow(wc),]
+        wc <- output$memberships
+        
+        # Check for no rows
+        if(nrow(wc) == 0){
+          wc <- output$membership
+        }else{
+          
+          # Obtain order
+          if(order == "lower"){
+            wc <- wc[1,]
+          }else if(order == "higher"){
+            wc <- wc[nrow(wc),]
+          }
+          
         }
-
+        
         # Return
         return(wc)
 
-      })
+      }, resolution = resolution)
 
       # Simplify to a matrix
       wc_matrix <- t(simplify2array(communities, higher = FALSE))
 
     }else{
-
-      # Homogenize memberships
-      wc_matrix <- t(homogenize.membership(
-        target.wc = wc_proportion,
-        convert.wc = t(wc_matrix)
-      ))
+      
+      # Check for non-unique memberships
+      if(length(wc_proportion) != length(na.omit(unique(wc_proportion)))){
+        
+        # Homogenize memberships
+        wc_matrix <- t(homogenize.membership(
+          target.wc = wc_proportion,
+          convert.wc = t(wc_matrix)
+        ))
+        
+      }
+      
+      # ^^^ checks for whether all variables are in individual
+      # communities
+      #
+      # current workaround for higher order dimensions with
+      # singleton dimensions
 
     }
 
@@ -760,20 +931,54 @@ consensus_clustering <- function(
     iter <- iter + 1
 
   }
-
-  # Obtain final communities
-  igraph_network <- convert2igraph(abs(network))
-  wc <- igraph::cluster_louvain(igraph_network)$memberships
-
-  # Obtain order
-  if(order == "lower"){
-    wc <- wc[1,]
-  }else if(order == "higher"){
-    wc <- wc[nrow(wc),]
+  
+  # Check for same dimensions
+  if(sum(network) == ncol(network)){
+    
+    # Set to all unique
+    wc <- 1:ncol(network)
+    
+  }else{
+    
+    # Obtain final communities
+    igraph_network <- suppressWarnings(
+      convert2igraph(abs(network))
+    )
+    
+    # Ensure all nodes are included in igraph
+    if(igraph::vcount(igraph_network) != ncol(network)){
+      
+      igraph_network <- igraph::add.vertices(
+        igraph_network,
+        nv = ncol(network) -
+          igraph::vcount(igraph_network)
+      )
+      
+    }
+    
+    # Obtain memberships
+    wc <- igraph::cluster_louvain(igraph_network, resolution = resolution)$memberships
+    
+    # Check for rows
+    if(nrow(wc) == 0){
+      wc <- matrix(
+        igraph::cluster_louvain(igraph_network, resolution = resolution)$membership,
+        nrow = 1,
+        byrow = TRUE
+      )
+    }
+    
+    # Obtain order
+    if(order == "lower"){
+      wc <- wc[1,]
+    }else if(order == "higher"){
+      wc <- wc[nrow(wc),]
+    }
+    
+    # Ensure vector
+    wc <- as.vector(wc)
+    
   }
-
-  # Ensure vector
-  wc <- as.vector(wc)
 
   # Assign names
   names(wc) <- network_names
@@ -793,55 +998,314 @@ consensus_clustering <- function(
   return(results)
 }
 
+# Lancichinetti & Fortunato (2012)
+#' @noRd
+# Most Common Consensus Clustering
+# Updated 22.07.2022
+most_common_consensus <- function(
+    network,
+    order = c("lower", "higher"),
+    consensus.iter,
+    resolution = 1
+)
+{
+  
+  # Obtain network names
+  network_names <- colnames(network)
+  
+  # Check for empty network
+  if(sum(network) == 0){
+    
+    # Return individual communities
+    wc <- 1:ncol(network)
+    
+    # Assign names
+    names(wc) <- network_names
+    
+    # Set up results
+    results <- list()
+    results$highest_modularity <- wc
+    results$most_common <- wc
+    results$iterative <- wc
+    results$lowest_tefi <- wc
+    results$summary_table <- "Empty network. No general factors found."
+    
+    # Return consensus
+    return(results)
+    
+    
+  }
+  
+  # Convert network to igraph
+  igraph_network <- suppressWarnings(
+    convert2igraph(abs(network))
+  )
+  
+  # Ensure all nodes are included in igraph
+  if(igraph::vcount(igraph_network) != ncol(network)){
+    
+    igraph_network <- igraph::add.vertices(
+      igraph_network,
+      nv = ncol(network) -
+        igraph::vcount(igraph_network)
+    )
+    
+  }
+  
+  # Apply Louvain
+  communities <- lapply(1:consensus.iter, function(j, resolution){
+    
+    # igraph output
+    output <- igraph::cluster_louvain(igraph_network, resolution = resolution)
+    
+    # Obtain memberships
+    wc <- output$memberships
+    
+    # Check for no rows
+    if(nrow(wc) == 0){
+      wc <- output$membership
+    }else{
+      
+      # Obtain order
+      if(order == "lower"){
+        wc <- wc[1,]
+      }else if(order == "higher"){
+        wc <- wc[nrow(wc),]
+      }
+      
+    }
+    
+    # Return
+    return(wc)
+    
+  }, resolution = resolution)
+  
+  # Simplify to a matrix
+  wc_matrix <- t(simplify2array(communities, higher = FALSE))
+  
+  # Make data frame
+  df <- as.data.frame(wc_matrix)
+  
+  # Obtain duplicate indices
+  dupe_ind <- duplicated(df)
+  
+  # Rows for non-duplicates
+  non_dupes <- data.frame(df[!dupe_ind,])
+  
+  # Rows for duplicates
+  dupes <- data.frame(df[dupe_ind,])
+  
+  # Match duplicates with non-duplicates
+  dupe_count <- table(
+    match(
+      data.frame(t(dupes)), data.frame(t(non_dupes))
+    ))
+  
+  # Change column names of non_dupes
+  if(!is.null(colnames(network))){
+    colnames(non_dupes) <- colnames(network)
+  }
+  
+  # Set up summary table
+  summary_table <- data.frame(
+    N_Dimensions = apply(non_dupes, 1, function(x){
+      length(na.omit(unique(x)))
+    }),
+    Proportion = as.matrix(count(wc_matrix) / nrow(wc_matrix))
+  )
+  
+  # Attach non-duplicate solutions
+  summary_table <- cbind(summary_table, non_dupes)
+  
+  # Obtain max proportion
+  wc_proportion <- unlist(summary_table[
+    which.max(summary_table[,"Proportion"]),
+    -c(1:2)
+  ])
+  
+  # Set up results
+  results <- list()
+  results$most_common <- wc_proportion
+  results$summary_table <- summary_table
+  
+  # Return consensus
+  return(results)
+}
+
 #%%%%%%%%%%%%%%%%%%%%
 # NETWORKTOOLBOX ----
 #%%%%%%%%%%%%%%%%%%%%
 
+#' @noRd
+# Cohen's d
+# Updated 01.08.2021
+d <- function(samp1, samp2)
+{
+  # Remove NAs
+  samp1 <- samp1[!is.na(samp1)]
+  samp2 <- samp2[!is.na(samp2)]
+  
+  # Means
+  m1 <- mean(samp1, na.rm = TRUE)
+  m2 <- mean(samp2, na.rm = TRUE)
+  
+  # Numerator
+  num <- m1 - m2
+  
+  # Degrees of freedom
+  df1 <- length(samp1) - 1
+  df2 <- length(samp2) - 1
+  
+  # Variance
+  var1 <- var(samp1, na.rm = TRUE)
+  var2 <- var(samp2, na.rm = TRUE)
+  
+  # Denominator
+  denom <- sqrt(
+    ((df1 * var1) + (df2 * var2)) / (df1 + df2)
+  )
+  
+  return(abs(num / denom))
+  
+}
+
 # adapt.a
 #' @noRd
-#' @importFrom stats qchisq
+#' @importFrom stats qchisq qf t.test var
 # Adaptive Alpha
-# Updated 30.12.2021
-adapt.a <- function (test = "cor",
+# Updated 01.08.2022
+adapt.a <- function (test = c("anova","chisq","cor","one.sample","two.sample","paired"),
                      ref.n = NULL, n = NULL, alpha = .05, power = .80,
-                     efxize = c("small","medium","large"))
+                     efxize = c("small","medium","large"), groups = NULL, df = NULL)
 {
-  if(missing(test))
-  {stop("test must be selected")
+  
+  # Need a test
+  if(missing(test)){
+    stop("test must be selected")
   }else{test <- match.arg(test)}
-
-  if(missing(efxize))
-  {
+  
+  # Assign medium effect size
+  if(missing(efxize)){
     efxize <- "medium"
     message("No effect size selected. Medium effect size computed.")
   }else{efxize <- efxize}
-
-  if(test=="cor")
-  {
-    if(efxize=="small")
-    {efxize <- .10
-    }else if(efxize=="medium")
-    {efxize <- .30
-    }else if(efxize=="large")
-    {efxize <- .50}
-
-    if(!is.numeric(efxize))
-    {stop("Effect size must be numeric")}
-
-    if(is.null(ref.n))
-    {ref.n <- pwr.r.test(r=efxize,power=power,sig.level=alpha)$n}
-
+  
+  # ANOVA
+  if(test == "anova"){
+    
+    # Check for groups
+    if(is.null(groups)){
+      stop("ANOVA is selected. Number of groups must be set")
+    }
+    
+    # Set effect size
+    efxize <- switch(
+      efxize,
+      "small" = 0.10,
+      "medium" = 0.25,
+      "large" = 0.40
+    )
+    
+    # Determine reference sample size
+    if(is.null(ref.n)){
+      ref.n <- pwr::pwr.anova.test(f=efxize,power=power,sig.level=alpha,k=groups)$n
+      message("ref.n is observations per group")
+    }
+    
+    # Numerator
     num <- sqrt(ref.n*(log(ref.n)+qchisq((1-alpha),1)))
-  }
+    
+  }else if(test == "chisq"){ # Chi-square
+    
+    # Needs degrees of freedom
+    if(is.null(df)){
+      stop("Chi-square is selected. Degrees of freedom must be set")
+    }
+    
+    # Set effect size
+    efxize <- switch(
+      efxize,
+      "small" = 0.10,
+      "medium" = 0.30,
+      "large" = 0.50
+    )
 
-  #denominator
+    # Determine reference sample size
+    if(is.null(ref.n)){
+      ref.n <- pwr::pwr.chisq.test(w=efxize,df=df,power=power,sig.level=alpha)$N
+    }
+    # Numerator
+    num <- sqrt(ref.n*(log(ref.n)+qchisq((1-alpha),1)))
+    
+  }else if(test == "cor"){ # Correlation
+    
+    # Set effect size
+    efxize <- switch(
+      efxize,
+      "small" = 0.10,
+      "medium" = 0.30,
+      "large" = 0.50
+    )
+    
+    # Determine reference sample size
+    if(is.null(ref.n)){
+      ref.n <- pwr::pwr.r.test(r=efxize,power=power,sig.level=alpha)$n
+    }
+    
+    # Numerator
+    num <- sqrt(ref.n*(log(ref.n)+qchisq((1-alpha),1)))
+    
+  }else if(any(c("one.sample", "two.sample", "paired") %in% test)){# t-test
+    
+    # Set effect size
+    efxize <- switch(
+      efxize,
+      "small" = 0.20,
+      "medium" = 0.50,
+      "large" = 0.80
+    )
+    
+    # Determine reference sample size
+    if(is.null(ref.n)){
+      ref.n <- pwr::pwr.t.test(d=efxize,power=power,sig.level=alpha,type=test)$n
+    }
+    
+    # Numerator
+    num <- sqrt(ref.n*(log(ref.n)+qchisq((1-alpha),1)))
+    
+  }else{stop("test does not exist")}
+  
+  # Denominator
   denom <- (sqrt(n*(log(n)+qchisq((1-alpha),1))))
-  #adjusted alpha calculation
+  
+  # Adjusted alpha calculation
   adj.a <- alpha*num/denom
-
-  #critical values
-  if(test=="cor")
-  {
+  
+  # Critical values
+  if(test == "anova"){
+    
+    critical.f <- function (groups, n, a)
+    {
+      df1 <- groups - 1
+      df2 <- n - groups
+      cvf <- qf(a, df1, df2, lower.tail = FALSE)
+      return(cvf)
+    }
+    
+    cv <- critical.f(groups, n, adj.a)
+    
+  }else if(test == "chisq"){
+    
+    critical.chi <- function (df, a)
+    {
+      cvchi <- qchisq(a, df, lower.tail = FALSE)
+      return(cvchi)
+    }
+    
+    cv <- critical.chi(df, adj.a)
+    
+  }else if(test == "cor"){
+    
     critical.r <- function (n, a)
     {
       df <- n - 2
@@ -849,21 +1313,40 @@ adapt.a <- function (test = "cor",
       cvr <- sqrt( (critical.t^2) / ( (critical.t^2) + df ) )
       return(cvr)
     }
-
+    
     cv <- critical.r(n, adj.a)
+    
+  }else if(any(c("one.sample", "two.sample", "paired") %in% test)){
+    
+    critical.t <- function (n, a)
+    {
+      df <- n - 2
+      cvt <- qt( a/2, df, lower.tail = FALSE )
+      return(cvt)
+    }
+    
+    cv <- critical.t(n, adj.a)
+    
   }
-
-  #output
-  output <- list()
-  output$adapt.a <- adj.a
-  output$crit.value <- cv
-  output$orig.a <- alpha
-  output$ref.n <- ref.n
-  output$exp.n <- n
-  output$power <- power
-  output$efxize <- efxize
+  
+  # Output
+  output <- list(
+    adapt.a = adj.a, crit.value = cv,
+    orig.a = alpha, ref.n = ref.n,
+    exp.n = n, power = power,
+    efxize = efxize
+  )
+  # Check for ANOVA or Chi-square
+  if(test == "anova"){
+    output$groups <- groups
+    output$df <- c((groups - 1), (n - groups))
+    
+  }else if(test=="chisq"){
+    output$df <- df
+  }
+  # Add test
   output$test <- test
-
+  
   return(output)
 }
 
@@ -1365,11 +1848,11 @@ cohen.ES <- function(test=c("p","t","r","anov","chisq","f2"),size=c("small","med
 # randnet
 #' @noRd
 # Generate random network
-# Updated 30.12.2021
+# Updated 02.07.2022
 randnet <- function (nodes = NULL, edges = NULL, A = NULL)
 {
-  if(is.null(A))
-  {
+  if(is.null(A)){
+    
     # Initialize matrix
     mat <- matrix(1, nrow = nodes, ncol = nodes)
 
@@ -1401,12 +1884,39 @@ randnet <- function (nodes = NULL, edges = NULL, A = NULL)
 
     # Compute degree
     degrees <- degree(A)
+    
+    # Identify disconnected nodes
+    if(any(degrees == 0)){
+      disconnected <- which(degrees == 0)
+      degrees <- degrees[-disconnected]
+    }
 
     # Get degrees based on directed or undirected
     # Use igraph
-    if(is.list(degrees))
-    {rand <- as.matrix(igraph::as_adj(igraph::sample_degseq(out.deg = degrees$outDegree, in.deg = degrees$inDegree, method = "vl")))
-    }else{rand <- as.matrix(igraph::as_adj(igraph::sample_degseq(out.deg = degrees, method = "vl")))}
+    if(is.list(degrees)){
+      rand <- as.matrix(igraph::as_adj(igraph::sample_degseq(out.deg = degrees$outDegree, in.deg = degrees$inDegree, method = "vl")))
+    }else{
+      rand <- as.matrix(igraph::as_adj(igraph::sample_degseq(out.deg = degrees, method = "vl")))
+    }
+    
+    # Add back disconnected nodes
+    if(exists("disconnected", envir = environment())){
+      
+      # New random matrix
+      new_rand <- matrix(0, nrow = ncol(A), ncol = ncol(A))
+      
+      # Insert old random matrix into new random matrix
+      new_rand[-disconnected, -disconnected] <- rand
+      
+      # Copy new random matrix into old
+      rand <- new_rand
+      
+    }
+    
+    # Apply back row and column names
+    row.names(rand) <- colnames(A)
+    colnames(rand) <- colnames(A)
+    
   }
 
   return(rand)
@@ -1622,6 +2132,125 @@ count <- function(data)
   counts[as.numeric(names(dupe_count))] <- counts[as.numeric(names(dupe_count))] + dupe_count
 
   return(counts)
+}
+
+#%%%%%%%%%
+# EGA ----
+#%%%%%%%%%
+
+#' @noRd
+# Unidimensionality check
+# Updated 27.07.2022
+unidimensionality.check <- function(
+    data,
+    n,
+    corr,
+    correlation, 
+    uni.method = c("louvain", "LE", "expand"),
+    model, model.args,
+    algorithm, algorithm.args,
+    consensus.method, consensus.iter
+)
+{
+  
+  # Make unidimensional method lowercase
+  uni.method <- tolower(uni.method)
+  
+  # Perform algorithm
+  if(uni.method == "louvain"){
+    
+    # Most common consensus with Louvain
+    wc <- most_common_consensus(
+      network = abs(correlation),
+      order = "higher",
+      consensus.iter = 1000,
+      resolution = 0.95
+    )$most_common
+    
+  }else if(uni.method == "le"){
+    
+    
+    # Try Leading Eigenvalue
+    wc <- try(
+      igraph::cluster_leading_eigen(
+        convert2igraph(abs(correlation))
+      )$membership,
+      silent = TRUE
+    )
+    
+    # If error, then use Louvain
+    if(any(class(wc) == "try-error")){
+      
+      # Most common consensus with Louvain
+      wc <- most_common_consensus(
+        network = abs(correlation),
+        order = "higher",
+        consensus.iter = 1000,
+        resolution = 0.95
+      )$most_common
+      
+      warning("Error occurred in Leading Eigenvalue algorithm. Using \"louvain\" for unidimensional check")
+      
+    }
+    
+  }else if(uni.method == "expand"){
+    
+    # Check for {igraph} algorithm
+    if(is.function(algorithm)){
+      
+      # Identify whether algorithm is Spinglass
+      if("spins" %in% methods::formalArgs(algorithm)){
+        
+        # Check for whether data are a correlation matrix
+        if(isSymmetric(unname(as.matrix(data)))){
+          data <- MASS_mvrnorm(n = n, mu = rep(0, ncol(data)), Sigma = data)
+        }
+        
+        # Simulate data from unidimensional factor model
+        sim.data <- sim.func(data = data, nvar = 4, nfact = 1, load = .70)
+        
+        ## Compute correlation matrix
+        correlation <- suppressMessages(
+          switch(corr,
+                 "cor_auto" = qgraph::cor_auto(sim.data, forcePD = TRUE),
+                 "pearson" = cor(sim.data, use = "pairwise.complete.obs"),
+                 "spearman" = cor(sim.data, method = "spearman", use = "pairwise.complete.obs")
+          )
+        )
+        
+      }else{## Expand correlation matrix
+        correlation <- expand.corr(correlation)
+      }
+      
+    }else{## Expand correlation matrix
+      correlation <- expand.corr(correlation)
+    }
+    
+    # Unidimensional result
+    wc <- EGA.estimate(
+      data = correlation, n = n,
+      model = model, model.args = model.args,
+      algorithm = algorithm, algorithm.args = algorithm.args,
+      consensus.method = consensus.method, consensus.iter = consensus.iter
+    )$wc
+    
+  }
+  
+  # Assign names
+  names(wc) <- colnames(correlation)
+  
+  # Collect dimensions
+  n.dim <- length(na.omit(unique(wc)))
+  
+  # Populate results
+  results <- list(
+    wc = wc,
+    n.dim = n.dim
+  )
+  
+  # Return results
+  return(results)
+  
 }
 
 #%%%%%%%%%%%%%%%%%%%%%%
@@ -2247,9 +2876,15 @@ GGally.args <- function(plot.args)
 
   if("color.palette" %in% names(plot.args)){
 
-    if(tolower(plot.args$color.palette) == "greyscale" | tolower(plot.args$color.palette) == "grayscale" | tolower(plot.args$color.palette) == "colorblind"){
-      plot.args$edge.color <- c("#293132", "grey25")
-      plot.args$edge.lty <- c("solid", "dashed")
+    if(length(plot.args$color.palette) == 1){
+      
+      if(tolower(plot.args$color.palette) == "greyscale" |
+         tolower(plot.args$color.palette) == "grayscale" | 
+         tolower(plot.args$color.palette) == "colorblind"){
+        plot.args$edge.color <- c("#293132", "grey25")
+        plot.args$edge.lty <- c("solid", "dashed")
+      }
+      
     }
 
   }
@@ -2322,12 +2957,9 @@ rescale.edges <- function (network, size)
 #' @noRd
 # Compare plots fix
 # Updated 28.03.2022
-compare.plot.fix.EGA <- function(object.list,  plot.type = c("GGally","qgraph"),
+compare.plot.fix.EGA <- function(object.list,
                                  plot.args = list()){
-  #### MISSING ARGUMENTS HANDLING
-  if(missing(plot.type))
-  {plot.type <- "GGally"
-  }else{plot.type <- match.arg(plot.type)}
+
 
   ## Original plot arguments
   original.plot.args <- plot.args
@@ -2357,150 +2989,145 @@ compare.plot.fix.EGA <- function(object.list,  plot.type = c("GGally","qgraph"),
     }
 
     ### Plot ###
-    if(plot.type == "qgraph"){
-      ega.plot <- qgraph::qgraph(x$network, layout = "spring", vsize = plot.args$vsize, groups = as.factor(x$wc))
-    }else if(plot.type == "GGally"){
-
-      if(i != 1){
-        ## Reset plot arguments
-        plot.args <- original.plot.args
-
-        ## Check for input plot arguments
-        if("legend.names" %in% names(plot.args)){
-          legend.names <- plot.args$legend.names
-        }
-        plot.args <- GGally.args(plot.args)
-        color.palette <- plot.args$color.palette
+    if(i != 1){
+      ## Reset plot arguments
+      plot.args <- original.plot.args
+      
+      ## Check for input plot arguments
+      if("legend.names" %in% names(plot.args)){
+        legend.names <- plot.args$legend.names
       }
-
-      # Insignificant values (keeps ggnet2 from erroring out)
-      x$network <- ifelse(abs(as.matrix(x$network)) <= .00001, 0, as.matrix(x$network))
-
-      if(exists("legend.names")){
-        for(l in 1:length(unique(legend.names))){
-          x$wc[x$wc == l] <- legend.names[l]
-        }
-      }
-
-      # Reorder network and communities
-      if(i == 1){
-        x$network <- x$network[order(x$wc), order(x$wc)]
-        x$wc <- x$wc[order(x$wc)]
-        fix.order.wc <- names(x$wc)
-      }else{
-        x$network <- x$network[fix.order.wc, fix.order.wc]
-        x$wc <- x$wc[fix.order.wc]
-      }
-
-      # weighted  network
-      network1 <- network::network(x$network,
-                                   ignore.eval = FALSE,
-                                   names.eval = "weights",
-                                   directed = FALSE)
-
-      network::set.vertex.attribute(network1, attrname= "Communities", value = x$wc)
-      network::set.vertex.attribute(network1, attrname= "Names", value = network::network.vertex.names(network1))
-      network::set.edge.attribute(network1, "color", ifelse(network::get.edge.value(network1, "weights") > 0, plot.args$edge.color[1], plot.args$edge.color[2]))
-      network::set.edge.attribute(network1, "line", ifelse(network::get.edge.value(network1, "weights") > 0, plot.args$edge.lty[1], plot.args$edge.lty[2]))
-      network::set.edge.value(network1,attrname="AbsWeights",value=abs(x$network))
-      network::set.edge.value(network1,attrname="ScaledWeights",
-                              value=matrix(rescale.edges(x$network, plot.args$edge.size),
-                                           nrow = nrow(x$network),
-                                           ncol = ncol(x$network)))
-
-      # Layout "Spring"
-      graph1 <- convert2igraph(x$network)
-      edge.list <- igraph::as_edgelist(graph1)
-      layout.spring <- qgraph::qgraph.layout.fruchtermanreingold(edgelist = edge.list,
-                                                                 weights =
-                                                                   abs(igraph::E(graph1)$weight/max(abs(igraph::E(graph1)$weight)))^2,
-                                                                 vcount = ncol(x$network))
-
-
-      set.seed(1234)
-      plot.args$net <- network1
-      plot.args$node.color <- "Communities"
-      plot.args$node.alpha <- plot.args$alpha
-      plot.args$node.shape <- plot.args$shape
-      node.size <- plot.args$node.size
-      plot.args$node.size <- 0
-      plot.args$color.palette <- NULL
-      plot.args$palette <- NULL
-      plot.args$edge.color <- "color"
-      plot.args$edge.lty <- "line"
-      plot.args$edge.size <- "ScaledWeights"
-
-      lower <- abs(x$network[lower.tri(x$network)])
-      non.zero <- sqrt(lower[lower != 0])
-
-      plot.args$edge.alpha <- non.zero
-      plot.args$mode <- layout.spring
-      plot.args$label <- colnames(x$network)
-      plot.args$node.label <- rep("", ncol(x$network))
-      if(plot.args$label.size == "max_size/2"){plot.args$label.size <- plot.args$size/2}
-      if(plot.args$edge.label.size == "max_size/2"){plot.args$edge.label.size <- plot.args$size/2}
-
-      palette <- color_palette_EGA(color.palette, as.numeric(factor(x$wc)))
-      palette <- ifelse(is.na(palette), "white", palette)
-
-      ega.plot <- suppressWarnings(
-        suppressMessages(
-          do.call(GGally::ggnet2, plot.args) +
-            ggplot2::theme(legend.title = ggplot2::element_blank())
-        )
-      )
-
-      name <- colnames(x$network)
-
-      name.split <- lapply(name, function(x){
-        unlist(strsplit(x, split = " "))
-      })
-
-      name <- unlist(
-        lapply(name.split, function(x){
-
-          len <- length(x)
-
-          if(len > 1){
-
-            add.line <- round(len / 2)
-
-            paste(
-              paste(x[1:add.line], collapse = " "),
-              paste(x[(add.line+1):length(x)], collapse = " "),
-              sep = "\n"
-            )
-
-          }else{x}
-
-        })
-      )
-
-      # Border color
-      if(all(color.palette == "grayscale" |
-             color.palette == "greyscale" |
-             color.palette == "colorblind")){
-        border.color <- ifelse(palette == "white", "white", "black")
-      }else{border.color <- palette}
-
-      # Custom nodes: transparent insides and dark borders
-      ega.plot <- ega.plot +
-        ggplot2::geom_point(ggplot2::aes(color = "color"), size = node.size,
-                            color = border.color,
-                            shape = 1, stroke = 1.5, alpha = .8) +
-        ggplot2::geom_point(ggplot2::aes(color = "color"), size = node.size + .5,
-                            color = palette,
-                            shape = 19, alpha = plot.args$alpha) +
-        ggplot2::geom_text(ggplot2::aes(label = name), color = "black", size = plot.args$label.size) +
-        ggplot2::guides(
-          color = ggplot2::guide_legend(override.aes = list(
-            color = unique(palette),
-            size = node.size,
-            alpha = as.numeric(names(which.max(table(plot.args$alpha)))),
-            stroke = 1.5
-          ))
-        )
+      plot.args <- GGally.args(plot.args)
+      color.palette <- plot.args$color.palette
     }
+    
+    # Insignificant values (keeps ggnet2 from erroring out)
+    x$network <- ifelse(abs(as.matrix(x$network)) <= .00001, 0, as.matrix(x$network))
+    
+    if(exists("legend.names")){
+      for(l in 1:length(unique(legend.names))){
+        x$wc[x$wc == l] <- legend.names[l]
+      }
+    }
+    
+    # Reorder network and communities
+    if(i == 1){
+      x$network <- x$network[order(x$wc), order(x$wc)]
+      x$wc <- x$wc[order(x$wc)]
+      fix.order.wc <- names(x$wc)
+    }else{
+      x$network <- x$network[fix.order.wc, fix.order.wc]
+      x$wc <- x$wc[fix.order.wc]
+    }
+    
+    # weighted  network
+    network1 <- network::network(x$network,
+                                 ignore.eval = FALSE,
+                                 names.eval = "weights",
+                                 directed = FALSE)
+    
+    network::set.vertex.attribute(network1, attrname= "Communities", value = x$wc)
+    network::set.vertex.attribute(network1, attrname= "Names", value = network::network.vertex.names(network1))
+    network::set.edge.attribute(network1, "color", ifelse(network::get.edge.value(network1, "weights") > 0, plot.args$edge.color[1], plot.args$edge.color[2]))
+    network::set.edge.attribute(network1, "line", ifelse(network::get.edge.value(network1, "weights") > 0, plot.args$edge.lty[1], plot.args$edge.lty[2]))
+    network::set.edge.value(network1,attrname="AbsWeights",value=abs(x$network))
+    network::set.edge.value(network1,attrname="ScaledWeights",
+                            value=matrix(rescale.edges(x$network, plot.args$edge.size),
+                                         nrow = nrow(x$network),
+                                         ncol = ncol(x$network)))
+    
+    # Layout "Spring"
+    graph1 <- convert2igraph(x$network)
+    edge.list <- igraph::as_edgelist(graph1)
+    layout.spring <- qgraph::qgraph.layout.fruchtermanreingold(edgelist = edge.list,
+                                                               weights =
+                                                                 abs(igraph::E(graph1)$weight/max(abs(igraph::E(graph1)$weight)))^2,
+                                                               vcount = ncol(x$network))
+    
+    
+    set.seed(1234)
+    plot.args$net <- network1
+    plot.args$node.color <- "Communities"
+    plot.args$node.alpha <- plot.args$alpha
+    plot.args$node.shape <- plot.args$shape
+    node.size <- plot.args$node.size
+    plot.args$node.size <- 0
+    plot.args$color.palette <- NULL
+    plot.args$palette <- NULL
+    plot.args$edge.color <- "color"
+    plot.args$edge.lty <- "line"
+    plot.args$edge.size <- "ScaledWeights"
+    
+    lower <- abs(x$network[lower.tri(x$network)])
+    non.zero <- sqrt(lower[lower != 0])
+    
+    plot.args$edge.alpha <- non.zero
+    plot.args$mode <- layout.spring
+    plot.args$label <- colnames(x$network)
+    plot.args$node.label <- rep("", ncol(x$network))
+    if(plot.args$label.size == "max_size/2"){plot.args$label.size <- plot.args$size/2}
+    if(plot.args$edge.label.size == "max_size/2"){plot.args$edge.label.size <- plot.args$size/2}
+    
+    palette <- color_palette_EGA(color.palette, as.numeric(factor(x$wc)))
+    palette <- ifelse(is.na(palette), "white", palette)
+    
+    ega.plot <- suppressWarnings(
+      suppressMessages(
+        do.call(GGally::ggnet2, plot.args) +
+          ggplot2::theme(legend.title = ggplot2::element_blank())
+      )
+    )
+    
+    name <- colnames(x$network)
+    
+    name.split <- lapply(name, function(x){
+      unlist(strsplit(x, split = " "))
+    })
+    
+    name <- unlist(
+      lapply(name.split, function(x){
+        
+        len <- length(x)
+        
+        if(len > 1){
+          
+          add.line <- round(len / 2)
+          
+          paste(
+            paste(x[1:add.line], collapse = " "),
+            paste(x[(add.line+1):length(x)], collapse = " "),
+            sep = "\n"
+          )
+          
+        }else{x}
+        
+      })
+    )
+    
+    # Border color
+    if(all(color.palette == "grayscale" |
+           color.palette == "greyscale" |
+           color.palette == "colorblind")){
+      border.color <- ifelse(palette == "white", "white", "black")
+    }else{border.color <- palette}
+    
+    # Custom nodes: transparent insides and dark borders
+    ega.plot <- ega.plot +
+      ggplot2::geom_point(ggplot2::aes(color = "color"), size = node.size,
+                          color = border.color,
+                          shape = 1, stroke = 1.5, alpha = .8) +
+      ggplot2::geom_point(ggplot2::aes(color = "color"), size = node.size + .5,
+                          color = palette,
+                          shape = 19, alpha = plot.args$alpha) +
+      ggplot2::geom_text(ggplot2::aes(label = name), color = "black", size = plot.args$label.size) +
+      ggplot2::guides(
+        color = ggplot2::guide_legend(override.aes = list(
+          color = unique(palette),
+          size = node.size,
+          alpha = as.numeric(names(which.max(table(plot.args$alpha)))),
+          stroke = 1.5
+        ))
+      )
 
     set.seed(NULL)
 
@@ -2518,6 +3145,125 @@ compare.plot.fix.EGA <- function(object.list,  plot.type = c("GGally","qgraph"),
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 # MULTI-FUNCTION SUB-ROUTINES ----
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+#' @noRd
+#'
+# Custom progress bar for timing
+# Updated 02.08.2022
+custom_progress <- function (
+    i, max, start_time,
+    caps = "|", progress = "+"
+) {
+  
+  # Calculate percent complete
+  percent <- i / max * 100
+  
+  # Check for calculating
+  if(is.character(start_time)){
+    
+    # Update progress
+    cat(
+      sprintf(
+        paste0("\r", caps, "%-49s", caps, " %s"),
+        paste(rep(progress, percent / 2), collapse = ""),
+        # Add percentage
+        timing <- paste0(
+          round(percent), "% ~",
+          start_time
+        )
+      )
+    )
+    
+  }else{
+    
+    # Obtain end time
+    end_time <- Sys.time()
+    
+    # Time difference
+    time_difference <- as.numeric(
+      difftime(
+        time1 = end_time,
+        time2 = start_time,
+        units = "sec"
+      )
+    )
+    
+    # Obtain time to finish based on remaining computations
+    time_multiple <- (max - i) / i
+    
+    # Multiple time difference by remaining computations
+    seconds <- time_multiple * time_difference
+    if(i == max){
+      seconds <- time_difference
+    }
+    
+    # Obtain remaining minutes
+    minutes <- as.numeric(seconds / 60)
+    
+    # Remaining seconds
+    seconds <- round(60 * minutes %% 1)
+    
+    # Floor remaining minutes
+    minutes <- floor(minutes)
+    
+    # Set timing with seconds
+    timing <- paste0(
+      formatC(
+        seconds, digits = 1,
+        flag = "0", format = "d"
+      ), "s"
+    )
+    
+    # Set timing with minutes
+    if(minutes != 0){
+      timing <- paste(
+        paste0(minutes, "m"),
+        timing
+      )
+    }
+    
+    # If max, then end
+    if(i == max){
+      
+      # Add percentage
+      timing <- paste0(
+        round(percent), "% elapsed=",
+        timing
+      )
+      
+      # Update progress
+      cat(
+        sprintf(
+          paste0("\r", caps, "%-49s", caps, " %s"),
+          paste(rep(progress, percent / 2), collapse = ""),
+          timing
+        )
+      )
+      
+      cat("\n")
+      
+    }else{
+      
+      # Add percentage
+      timing <- paste0(
+        round(percent), "% ~",
+        timing
+      )
+      
+      # Update progress
+      cat(
+        sprintf(
+          paste0("\r", caps, "%-49s", caps, " %s        "),
+          paste(rep(progress, percent / 2), collapse = ""),
+          timing
+        )
+      )
+      
+    }
+    
+  }
+  
+}
 
 #' \code{\link[qgraph]{EBICglasso}} from \code{\link{qgraph}} 1.4.4
 #'
@@ -2894,10 +3640,35 @@ MASS_mvrnorm <- function (n = 1, mu, Sigma, tol = 1e-06, empirical = FALSE, EISP
 }
 
 #' @noRd
-# Converts networks to igraph
-convert2igraph <- function (A, neural = FALSE)
+# Function to obtain arguments
+# Updated 27.07.2022
+obtain.arguments <- function(FUN, FUN.args)
 {
-  return(igraph::as.igraph(qgraph::qgraph(A,DoNotPlot=TRUE)))
+  
+  # Obtain formal arguments
+  FUN.formals <- formals(FUN)
+  
+  # Check for input arguments
+  if(length(FUN.args) != 0){
+    
+    ## Check for matching arguments
+    if(any(names(FUN.args) %in% names(FUN.formals))){
+      
+      replace.args <- FUN.args[na.omit(match(names(FUN.formals), names(FUN.args)))]
+      
+      FUN.formals[names(replace.args)] <- replace.args
+    }
+    
+  }
+  
+  # Remove ellipses
+  if("..." %in% names(FUN.formals)){
+    FUN.formals[which(names(FUN.formals) == "...")] <- NULL
+  }
+  
+  # Return agrumnets
+  return(FUN.formals)
+  
 }
 
 #%%%%%%%%%%%%%%%%%%%%%%%%
@@ -3444,9 +4215,12 @@ dnn.predict <- function (loads)
 #' @noRd
 #'
 # Typical network (bootEGA) function
-# Updated 12.03.2020
-typicalStructure.network <- function (A, corr, model, model.args, n = NULL, uni.method,
-                                      algorithm, algorithm.args)
+# Updated 01.08.2022
+typicalStructure.network <- function (
+    A, corr, model, model.args, n = NULL, uni.method,
+    algorithm, algorithm.args,
+    consensus.method, consensus.iter
+)
 {
 
   # Convert to igraph
@@ -3462,54 +4236,105 @@ typicalStructure.network <- function (A, corr, model, model.args, n = NULL, uni.
 
   }
 
-  # Algorithm Arguments
-  ## Check for algorithm
+  # Algorithm function
   if(!is.function(algorithm)){
-
-    if(algorithm == "walktrap"){
-      algorithm.formals <- formals(igraph::cluster_walktrap)
-    }else if(algorithm == "louvain"){
-      algorithm.formals <- formals(igraph::cluster_louvain)
-    }
-
-  }else{algorithm.formals <- formals(algorithm)}
-
-  ## Check for input algorithm arguments
-  if(length(algorithm.args) != 0){
-
-    ### Check for matching arguments
-    if(any(names(algorithm.args) %in% names(algorithm.formals))){
-
-      algorithm.replace.args <- algorithm.args[na.omit(match(names(algorithm.formals), names(algorithm.args)))]
-
-      algorithm.formals[names(algorithm.replace.args)] <- algorithm.replace.args
-    }
-
+    algorithm.FUN <- switch(
+      algorithm,
+      "walktrap" = igraph::cluster_walktrap,
+      "leiden" = igraph::cluster_leiden,
+      "louvain" = igraph::cluster_louvain
+    )
+  }else{
+    algorithm.FUN <- algorithm
   }
-
-  ## Remove ellipses
-  if("..." %in% names(algorithm.formals)){
-    algorithm.formals[which(names(algorithm.formals) == "...")] <- NULL
-  }
+  
+  # Algorithm arguments
+  algorithm.ARGS <- obtain.arguments(
+    FUN = algorithm.FUN,
+    FUN.args = algorithm.args
+  )
 
   ## Remove weights from igraph functions' arguments
-  if("weights" %in% names(algorithm.formals)){
-    algorithm.formals[which(names(algorithm.formals) == "weights")] <- NULL
+  if("weights" %in% names(algorithm.ARGS)){
+    algorithm.ARGS[which(names(algorithm.ARGS) == "weights")] <- NULL
   }
 
-  # Multidimensional result
-  ## Run community detection algorithm
-  algorithm.formals$graph <- graph
-
-  if(!is.function(algorithm)){
-
-    multi.wc <- switch(algorithm,
-                       "walktrap" = do.call(igraph::cluster_walktrap, as.list(algorithm.formals))$membership,
-                       "louvain" = do.call(igraph::cluster_louvain, as.list(algorithm.formals))$membership
+  # Check for unconnected nodes
+  if(all(degree(A) == 0)){
+    
+    # Initialize community membership list
+    wc <- list()
+    wc$membership <- rep(NA, ncol(A))
+    warning(
+      "Estimated network contains unconnected nodes:\n",
+      paste(names(which(strength(A)==0)), collapse = ", ")
     )
-
-  }else{multi.wc <- do.call(what = algorithm, args = as.list(algorithm.formals))$membership}
-
+    
+    unconnected <- which(degree(A) == 0)
+    
+  }else{
+    
+    if(any(degree(A) == 0)){
+      
+      warning(
+        "Estimated network contains unconnected nodes:\n",
+        paste(names(which(strength(A)==0)), collapse = ", ")
+      )
+      
+      unconnected <- which(degree(A) == 0)
+      
+    }
+    
+    # Check if algorithm is a function
+    if(is.function(algorithm)){
+      
+      # Convert to igraph
+      graph <- suppressWarnings(convert2igraph(abs(A)))
+      
+      # Run community detection algorithm
+      algorithm.ARGS$graph <- graph
+      
+      # Call community detection algorithm
+      wc <- do.call(
+        what = algorithm.FUN,
+        args = algorithm.ARGS
+      )$membership
+      
+    }else if(tolower(algorithm) == "louvain"){
+      
+      # Initialize community membership list
+      wc <- list()
+      
+      # Population community membership list
+      wc <- consensus_clustering(
+        network = A,
+        corr = A,
+        order = "higher",
+        consensus.iter = consensus.iter,
+        resolution = algorithm.ARGS$resolution
+      )[[consensus.method]]
+      
+    }else{
+      
+      # Convert to igraph
+      graph <- suppressWarnings(convert2igraph(abs(A)))
+      
+      # Run community detection algorithm
+      algorithm.ARGS$graph <- graph
+      
+      # Call community detection algorithm
+      wc <- do.call(
+        what = algorithm.FUN,
+        args = algorithm.ARGS
+      )$membership
+      
+    }
+    
+  }
+  
+  # Make wc == multi.wc
+  multi.wc <- wc
+  
   # Get new data
   if(model == "glasso"){
 
@@ -3601,13 +4426,32 @@ typicalStructure.network <- function (A, corr, model, model.args, n = NULL, uni.
 
     # Leading eigenvalue approach for one and two dimensions
     wc <- igraph::cluster_leading_eigen(convert2igraph(abs(cor.data)))$membership
-    names(wc) <- colnames(cor.data)
+    names(wc) <- colnames(A)
     n.dim <- length(na.omit(unique(wc)))
 
 
     # Set up results
     if(n.dim != 1){
       wc <- multi.wc
+    }else if(uni.method == "louvain"){
+      
+      ## Compute correlation matrix
+      cor.data <- switch(corr,
+                         "cor_auto" = qgraph::cor_auto(data),
+                         "pearson" = cor(data, use = "pairwise.complete.obs"),
+                         "spearman" = cor(data, method = "spearman", use = "pairwise.complete.obs")
+      )
+      
+      # Most common consensus with Louvain
+      wc <- most_common_consensus(
+        network = abs(cor.data),
+        order = "higher",
+        consensus.iter = 1000,
+        resolution = 0.95
+      )$most_common
+      names(wc) <- colnames(A)
+      n.dim <- length(na.omit(unique(wc)))
+      
     }
 
   }
@@ -3629,315 +4473,6 @@ typicalStructure.network <- function (A, corr, model, model.args, n = NULL, uni.
 
 }
 
-#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-# dynEGA and mctest.ergoInfo ----
-#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-## Dynamic EGA used in the mctest.ergoInfo function
-#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-#' Dynamic EGA used in the mctest.ergoInfo function
-#' @description Dynamic EGA used in the mctest.ergoInfo function. DynEGA estimates dynamic factors in multivariate time series (i.e. longitudinal data, panel data, intensive longitudinal data) at multiple
-#' time scales, in different levels of analysis: individuals (intraindividual structure) and population (structure of the population).
-#' Exploratory graph analysis is applied in the derivatives estimated using generalized local linear approximation (\code{\link[EGAnet]{glla}}). Instead of estimating factors by modeling how variables are covarying, as in traditional
-#' EGA, dynEGA is a dynamic model that estimates the factor structure by modeling how variables are changing together.
-#' GLLA is a filtering method for estimating derivatives from data that uses time delay embedding and a variant of Savitzky-Golay filtering to accomplish the task.
-#'
-#' @param data A dataframe with the variables to be used in the analysis. The dataframe should be in a long format (i.e. observations for the same individual (for example, individual 1) are placed in order, from time 1 to time t, followed by the observations from individual 2, also ordered from time 1 to time t.)
-#'
-#' @param n.embed Integer.
-#' Number of embedded dimensions (the number of observations to be used in the \code{\link[EGAnet]{Embed}} function). For example,
-#' an \code{"n.embed = 5"} will use five consecutive observations to estimate a single derivative.
-#'
-#' @param tau Integer.
-#' Number of observations to offset successive embeddings in the \code{\link[EGAnet]{Embed}} function. A tau of one uses adjacent observations.
-#' Default is \code{"tau = 1"}.
-#'
-#' @param delta Integer.
-#' The time between successive observations in the time series.
-#' Default is \code{"delta = 1"}.
-#'
-#' @param id Numeric.
-#' Number of the column identifying each individual.
-#'
-#'
-#' @param use.derivatives Integer.
-#' The order of the derivative to be used in the EGA procedure. Default to 1.
-#'
-#' @param corr Type of correlation matrix to compute. The default uses \code{\link[qgraph]{cor_auto}}.
-#' Current options are:
-#'
-#' \itemize{
-#'
-#' \item{\strong{\code{cor_auto}}}
-#' {Computes the correlation matrix using the \code{\link[qgraph]{cor_auto}} function from
-#' \code{\link[qgraph]{qgraph}}}.
-#'
-#' \item{\strong{\code{pearson}}}
-#' {Computes Pearson's correlation coefficient using the pairwise complete observations via
-#' the \code{\link[stats]{cor}}} function.
-#'
-#' \item{\strong{\code{spearman}}}
-#' {Computes Spearman's correlation coefficient using the pairwise complete observations via
-#' the \code{\link[stats]{cor}}} function.
-#' }
-#'
-#' @param model Character.
-#' A string indicating the method to use. Defaults to \code{glasso}.
-#' Current options are:
-#'
-#' \itemize{
-#'
-#' \item{\strong{\code{glasso}}}
-#' {Estimates the Gaussian graphical model using graphical LASSO with
-#' extended Bayesian information criterion to select optimal regularization parameter.
-#' This is the default method}
-#'
-#' \item{\strong{\code{TMFG}}}
-#' {Estimates a Triangulated Maximally Filtered Graph}
-#'
-#' }
-#'
-#' @param model.args List.
-#' A list of additional arguments for \code{\link[EGAnet]{EBICglasso.qgraph}}
-#' or \code{\link[EGAnet]{TMFG}}
-#'
-#' @param algorithm A string indicating the algorithm to use or a function from \code{\link{igraph}}
-#'
-#' Current options are:
-#'
-#' \itemize{
-#'
-#' \item{\strong{\code{walktrap}}}
-#' {Computes the Walktrap algorithm using \code{\link[igraph]{cluster_walktrap}}}
-#'
-#' \item{\strong{\code{louvain}}}
-#' {Computes the Walktrap algorithm using \code{\link[igraph]{cluster_louvain}}}
-#'
-#' }
-#'
-#' @param algorithm.args List.
-#' A list of additional arguments for \code{\link[igraph]{cluster_walktrap}}, \code{\link[igraph]{cluster_louvain}},
-#' or some other community detection algorithm function (see examples)
-#'
-#' @param ncores Numeric.
-#' Number of cores to use in computing results.
-#' Defaults to \code{parallel::detectCores() / 2} or half of your
-#' computer's processing power.
-#' Set to \code{1} to not use parallel computing.
-#' Recommended to use maximum number of cores minus one
-#'
-#' If you're unsure how many cores your computer has,
-#' then use the following code: \code{parallel::detectCores()}
-#'
-#' @param ... Additional arguments.
-#' Used for deprecated arguments from previous versions of \code{\link{EGA}}
-#'
-#' @author Hudson Golino <hfg9s at virginia.edu>
-#'
-#' @examples
-#' \dontrun{
-#' \donttest{# Population structure:
-#' dyn.ega1 <- dynEGA.ind.pop(data = sim.dynEGA, n.embed = 5, tau = 1,
-#' delta = 1, id = 21, use.derivatives = 1, model = "glasso", ncores = 2,
-#' cor = "pearson")
-#' }
-#' }
-#'
-#' @importFrom stats cor rnorm runif na.omit
-#' @export
-
-dynEGA.ind.pop <- function(data, n.embed, tau = 1, delta = 1,
-                           id = NULL,
-                           use.derivatives = 1,
-                           model = c("glasso", "TMFG"), model.args = list(),
-                           algorithm = c("walktrap", "louvain"), algorithm.args = list(),
-                           corr = c("cor_auto", "pearson", "spearman"),
-                           ncores, ...){
-
-  # Get additional arguments
-  add.args <- list(...)
-
-  # Check if steps has been input as an argument
-  if("steps" %in% names(add.args)){
-
-    # Give deprecation warning
-    warning(
-      paste(
-        "The 'steps' argument has been deprecated in all EGA functions.\n\nInstead use: algorithm.args = list(steps = ", add.args$steps, ")",
-        sep = ""
-      )
-    )
-
-    # Handle the number of steps appropriately
-    algorithm.args$steps <- add.args$steps
-  }
-
-
-  # MISSING ARGUMENTS HANDLING
-  if(missing(id))
-  {stop("The 'id' argument is missing! \n The number of the column identifying each individual must be provided!")
-  }else{id <- id}
-
-  if(missing(corr))
-  {corr <- "cor_auto"
-  }else{corr <- match.arg(corr)}
-
-  if(missing(ncores))
-  {ncores <- ceiling(parallel::detectCores() / 2)
-  }else{ncores}
-
-  # Setting the order:
-
-  order = 2
-
-  ### Spliting by ID:
-
-  #number of cases
-  cases <- unique(data[,id])
-
-  #initialize data list
-  datalist <- vector("list", length = length(cases))
-  datalist <- split(data[,-c(id)],data[,id])
-
-  ### Estimating the derivatives using GLLA:
-
-  #let user know derivatives estimation has started
-  message("\nComputing derivatives using GLLA...\n", appendLF = FALSE)
-
-
-  #initialize derivatives list
-  derivlist <- list()
-
-  #Parallel processing
-  cl <- parallel::makeCluster(ncores)
-
-  #Export variables
-  parallel::clusterExport(cl = cl,
-                          varlist = c("datalist", "derivlist", "cases"),
-                          envir=environment())
-
-  # GLLA Estimation:
-  glla.multi <- function(data, n.embed = n.embed, tau = tau, delta = delta, order = order){
-    order.deriv <- paste0("Ord",seq(from = 0, to = order))
-    data.est <- vector("list")
-    for(i in 1:ncol(data)){
-      data.est[[i]] <- as.data.frame(EGAnet::glla(data[,i], n.embed = n.embed, tau = tau, delta = delta, order = order))
-      data.est[[i]] <- as.data.frame(data.est[[i]])
-    }
-    data.est2 <- vector("list")
-    for(i in 0:order+1){
-      data.est2[[i]] <- sapply(data.est, "[[", i)
-    }
-
-    data.estimates <- data.frame(Reduce(cbind, data.est2))
-    colnames(data.estimates) <- paste(colnames(data), rep(order.deriv, each = ncol(data)), sep = ".")
-    return(data.estimates)
-  }
-
-  #Compute derivatives per ID
-  derivlist <- pbapply::pblapply(X = datalist, cl = cl,
-                                 FUN = glla.multi,
-                                 n.embed = n.embed, tau = tau, delta = delta, order = order)
-
-  ### Estimating the dimensionality structure using EGA:
-
-  message("Estimating the dimensionality structure using EGA...\n", appendLF = FALSE)
-
-  for(i in 1:length(cases)){
-    derivlist[[i]]$ID <- data[which(data[,id]==cases[i]),id][-c(1:(n.embed-1))]
-  }
-
-  names(derivlist) <- paste0("ID", cases)
-  # Population Level:
-  message("Level: Population...\n", appendLF = FALSE)
-
-  data.all <- data.frame(Reduce(rbind, derivlist))
-
-  # EGA Part
-
-  if(use.derivatives == 0){
-    ega1 <- EGA.estimate(data = data.all[,1:ncol(data[,-c(id)])],
-                         model = model, model.args = model.args,
-                         algorithm = algorithm, algorithm.args = algorithm.args,
-                         corr = corr)}
-  if(use.derivatives == 1){
-    ega1 <- EGA.estimate(data = data.all[,(ncol(data[,-c(id)])+1):(ncol(data[,-c(id)])*2)],
-                         model = model, model.args = model.args,
-                         algorithm = algorithm, algorithm.args = algorithm.args,
-                         corr = corr)}
-  if(use.derivatives==2){
-    init <- (ncol(data[,-c(id)])*2)+1
-    cols <- seq(from = init, to = init+ncol(data[,-c(id)])-1)
-    ega1 <- EGA.estimate(data = data.all[,cols],
-                         model = model, model.args = model.args,
-                         algorithm = algorithm, algorithm.args = algorithm.args,
-                         corr = corr)}
-
-  parallel::stopCluster(cl)
-
-  # Level: Individual (intraindividual structure):
-  message("Level: Individual (Intraindividual Structure)...\n", appendLF = FALSE)
-
-  data.all <- data.frame(Reduce(rbind, derivlist))
-
-  # Which derivatives to use:
-  if(use.derivatives == 0){
-    colstouse <- colnames(data.all[,1:ncol(data[,-c(id)])])}
-  if(use.derivatives == 1){
-    colstouse <- colnames(data.all[,(ncol(data[,-c(id)])+1):(ncol(data[,-c(id)])*2)])}
-  if(use.derivatives==2){
-    init <- (ncol(data[,-c(id)])*2)+1
-    cols <- seq(from = init, to = init+ncol(data[,-c(id)])-1)
-    colstouse <- colnames(data.all[,cols])
-  }
-
-  #initialize data list
-  data.individuals <- vector("list", length = length(cases))
-  data.individuals <- split(data.all[,colstouse],data.all$ID)
-  names(data.individuals) <- paste0("ID", cases)
-
-
-  #Parallel processing
-  cl <- parallel::makeCluster(ncores)
-
-  #Export variables
-  parallel::clusterExport(cl = cl,
-                          varlist = c("data.individuals", "cases"),
-                          envir=environment())
-
-  # EGA estimates per individual:
-  ega.list.individuals <- list()
-
-  ega.list.individuals <- pbapply::pblapply(X = data.individuals, cl = cl,
-                                            FUN = EGA.estimate,
-                                            model = model, model.args = model.args,
-                                            algorithm = algorithm, algorithm.args = algorithm.args,
-                                            corr = corr)
-  parallel::stopCluster(cl)
-
-  #let user know results have been computed
-  message("done", appendLF = TRUE)
-
-  # Results:
-  results <- vector("list")
-  results$Derivatives <- vector("list")
-  results$Derivatives$Estimates <- derivlist
-  results$Derivatives$EstimatesDF <- data.all
-  results$dynEGA.pop <- ega1
-  results$dynEGA.ind <- ega.list.individuals
-  if(use.derivatives == 0){
-    results$data.all <- data.all[,1:ncol(data[,-c(id)])]}
-  if(use.derivatives == 1){
-    results$data.all <- data.all[,(ncol(data[,-c(id)])+1):(ncol(data[,-c(id)])*2)]}
-  if(use.derivatives == 2){
-    results$data.all <- data.all[,cols]}
-  results$data.individuals <- data.individuals
-  results$model <- model
-  class(results) <- "dynEGA.ind.pop"
-  return(results)
-}
-
 #%%%%%%%%%
 # UVA ----
 #%%%%%%%%%
@@ -3947,13 +4482,6 @@ dynEGA.ind.pop <- function(data, n.embed, tau = 1, delta = 1,
 # Updated 04.05.2022
 redundancy.process <- function(data, cormat, n, model, method, type, sig, plot.redundancy, plot.args)
 {
-  # Compute redundancy method
-  # if(method == "irt"){
-  #
-  #   mod <- mirt::mirt(data,1)
-  #   sink <- capture.output(tom <- mirt::residuals(mod,type="Q3"))
-  #
-  # }else{
 
   if(method == "wto"){
 
@@ -3985,7 +4513,6 @@ redundancy.process <- function(data, cormat, n, model, method, type, sig, plot.r
 
   }else{tom <- cormat}
 
-  #}
 
   # Ensure column names
   if(is.null(colnames(tom))){
@@ -4023,49 +4550,51 @@ redundancy.process <- function(data, cormat, n, model, method, type, sig, plot.r
     aic <- NULL
     g.dist <- NULL
   }else{## Determine distribution
+    
+    stop('"alpha" and "adapt" have been removed from UVA. Please use "threshold"')
 
-    # Distributions, initialize AIC vector
-    distr <- c("norm", "gamma")
-    aic <- numeric(length(distr))
-    names(aic) <- c("normal", "gamma")
-
-    ## Obtain distribution
-    for(i in 1:length(distr)){
-      capture.output(
-        aic[i] <- fitdistrplus::fitdist(pos.vals, distr[i], method="mle")$aic
-      )
-    }
-
-    ## Obtain parameters
-    g.dist <- suppressWarnings(
-      fitdistrplus::fitdist(
-        pos.vals, distr[which.min(aic)]
-      )$estimate
-    )
-
-    # Estimate p-values
-    pval <- switch(names(aic)[which.min(aic)],
-
-                   normal = 1 - unlist(lapply(pos.vals, # positive values
-                                              pnorm, # probability in normal distribution
-                                              mean = g.dist["mean"], #mean of normal
-                                              sd = g.dist["sd"]) #standard deviation of normal
-                   ),
-
-                   gamma = 1 - unlist(lapply(pos.vals, # positive values
-                                             pgamma, # probability in gamma distribution
-                                             shape = g.dist["shape"], # shape of gamma
-                                             rate = g.dist["rate"]) # rate of gamma
-                   ),
-    )
-
-    # Check if using adaptive alpha
-    if(type == "adapt"){
-      sig <- adapt.a("cor", alpha = sig, n = length(pos.vals), efxize = "medium")$adapt.a
-    }
-
-    # Get redundant pairings
-    redund <- pos.vals[which(pval <= sig)]
+    # # Distributions, initialize AIC vector
+    # distr <- c("norm", "gamma")
+    # aic <- numeric(length(distr))
+    # names(aic) <- c("normal", "gamma")
+    # 
+    # ## Obtain distribution
+    # for(i in 1:length(distr)){
+    #   capture.output(
+    #     aic[i] <- fitdistrplus::fitdist(pos.vals, distr[i], method="mle")$aic
+    #   )
+    # }
+    # 
+    # ## Obtain parameters
+    # g.dist <- suppressWarnings(
+    #   fitdistrplus::fitdist(
+    #     pos.vals, distr[which.min(aic)]
+    #   )$estimate
+    # )
+    # 
+    # # Estimate p-values
+    # pval <- switch(names(aic)[which.min(aic)],
+    # 
+    #                normal = 1 - unlist(lapply(pos.vals, # positive values
+    #                                           pnorm, # probability in normal distribution
+    #                                           mean = g.dist["mean"], #mean of normal
+    #                                           sd = g.dist["sd"]) #standard deviation of normal
+    #                ),
+    # 
+    #                gamma = 1 - unlist(lapply(pos.vals, # positive values
+    #                                          pgamma, # probability in gamma distribution
+    #                                          shape = g.dist["shape"], # shape of gamma
+    #                                          rate = g.dist["rate"]) # rate of gamma
+    #                ),
+    # )
+    # 
+    # # Check if using adaptive alpha
+    # if(type == "adapt"){
+    #   sig <- adapt.a("cor", alpha = sig, n = length(pos.vals), efxize = "medium")$adapt.a
+    # }
+    # 
+    # # Get redundant pairings
+    # redund <- pos.vals[which(pval <= sig)]
 
   }
 
@@ -4169,19 +4698,19 @@ redundancy.process <- function(data, cormat, n, model, method, type, sig, plot.r
                       aic = aic, g.dist = g.dist)
 
   # Add p-values
-  if(type != "threshold"){
-    desc$basic <- cbind(round(sig, 5), desc$basic)
-    colnames(desc$basic)[1] <- "Sig"
-    desc$centralTendency <- cbind(round(pval[row.names(desc$centralTendency)], 5),
-                                  desc$centralTendency)
-    colnames(desc$centralTendency)[1] <- "p-value"
-  }
+  # if(type != "threshold"){
+  #   desc$basic <- cbind(round(sig, 5), desc$basic)
+  #   colnames(desc$basic)[1] <- "Sig"
+  #   desc$centralTendency <- cbind(round(pval[row.names(desc$centralTendency)], 5),
+  #                                 desc$centralTendency)
+  #   colnames(desc$centralTendency)[1] <- "p-value"
+  # }
 
   # Results list
   res <- list()
   res$redundant <- res.list
   res$data <- data
-  if(method != "irt"){res$correlation <- cormat}
+  res$correlation <- cormat
   res$weights <- tom
   if(exists("net")){res$network <- net}
   if(exists("net.plot")){res$plot <- net.plot}
@@ -4189,7 +4718,7 @@ redundancy.process <- function(data, cormat, n, model, method, type, sig, plot.r
   res$method <- method
   res$model <- model
   res$type <- type
-  if(type != "threshold"){res$distribution <- names(aic)[which.min(aic)]}
+  # if(type != "threshold"){res$distribution <- names(aic)[which.min(aic)]}
 
   class(res) <- "node.redundant"
 
@@ -4542,15 +5071,17 @@ redund.reduce <- function(node.redundant.obj, reduce.method, plot.args, lavaan.a
         # Replace arguments
         lavaan.args$model <- mod
         lavaan.args$data <- new.data
+        
         ## Get default estimator
         categories <- apply(new.data[,c(tar.idx, idx)], 2, function(x){
           length(unique(x))
         })
 
-        ## Check categories
-        if(any(categories < 6)){# Not all continuous
+        # Check categories
+        if(sum(categories < 6) > 1){# Not all continuous
           lavaan.args$estimator <- "WLSMV"
           lavaan.args$missing <- "pairwise"
+          lavaan.args$ordered <- TRUE
         }else{# All can be considered continuous
           lavaan.args$estimator <- "MLR"
           lavaan.args$missing <- "fiml"
@@ -4960,13 +5491,14 @@ redund.reduce.auto <- function(node.redundant.obj,
         # Replace arguments
         lavaan.args$model <- mod
         lavaan.args$data <- new.data
+        
         ## Get default estimator
         categories <- apply(new.data[,c(tar.idx, idx)], 2, function(x){
           length(unique(x))
         })
 
-        ## Check categories
-        if(any(categories < 6)){# Not all continuous
+        # Check categories
+        if(sum(categories < 6) > 1){# Not all continuous
           lavaan.args$estimator <- "WLSMV"
           lavaan.args$missing <- "pairwise"
           lavaan.args$ordered <- TRUE
@@ -5242,7 +5774,7 @@ redund.reduce.auto <- function(node.redundant.obj,
 
 #' @noRd
 # Redundancy Adhoc Reduction (Automated)
-# Updated 01.05.2022
+# Updated 20.07.2022
 redund.adhoc.auto <- function(node.redundant.obj,
                               node.redundant.reduced,
                               node.redundant.original,
@@ -5268,6 +5800,40 @@ redund.adhoc.auto <- function(node.redundant.obj,
       redund <- redund[-which(names(redund) %in% redund[[i]])]
     }
 
+  }
+  
+  # Check for other overlaps
+  for(i in 1:length(redund)){
+    
+    # Identify any overlap
+    target <- any(redund[[i]] %in% unlist(redund[-i]))
+    
+    # Remove latter overlap
+    if(isTRUE(target)){
+      
+      # Obtain matched target
+      matched <- unlist(redund[-i])[match(redund[[i]], unlist(redund[-i]))]
+      matched <- matched[!is.na(matched)]
+      
+      # Remove from each list
+      for(j in 1:length(matched)){
+        
+        # Target list
+        target_list <- redund[[names(matched)[j]]]
+        target_list[which(target_list == matched[j])] <- NA
+        
+        # Return target list
+        redund[[names(matched)[j]]] <- na.omit(target_list)
+      }
+      
+    }
+    
+  }
+  
+  # Remove empty lists
+  lengths <- unlist(lapply(redund, length))
+  if(any(lengths == 0)){
+    redund <- redund[-which(lengths == 0)]
   }
 
   # Copied data
@@ -5372,10 +5938,11 @@ redund.adhoc.auto <- function(node.redundant.obj,
         length(unique(x))
       })
 
-      ## Check categories
-      if(any(categories < 6)){# Not all continuous
+      # Check categories
+      if(sum(categories < 6) > 1){# Not all continuous
         lavaan.args$estimator <- "WLSMV"
         lavaan.args$missing <- "pairwise"
+        lavaan.args$ordered <- TRUE
       }else{# All can be considered continuous
         lavaan.args$estimator <- "MLR"
         lavaan.args$missing <- "fiml"
@@ -6430,7 +6997,214 @@ itemStability.loadings <- function(res, bootega.obj)
   return(mean.loadings)
 }
 
+#%%%%%%%%%%%%%%%%%%%
+# boot.ergoInfo ----
+#%%%%%%%%%%%%%%%%%%%
 
+#' Expand grid with unique edges
+#' @noRd
+# Updated 07.07.2022
+expand.grid.unique <- function(x, y, include.equals = FALSE)
+{
+  x <- unique(x)
+  
+  y <- unique(y)
+  
+  g <- function(i)
+  {
+    z <- setdiff(y, x[seq_len(i-include.equals)])
+    
+    if(length(z)) cbind(x[i], z, deparse.level=0)
+  }
+  
+  do.call(rbind, lapply(seq_along(x), g))
+}
+
+#' Rewiring function
+#' @noRd
+# Updated 16.07.2022
+rewire <- function(network, min = 0.20, max = 0.40, noise = TRUE)
+{
+  
+  # Number of edges
+  edges <- sum(ifelse(network != 0, 1, 0)) / 2
+  
+  # Add noise
+  if(isTRUE(noise)){
+    
+    # Lower triangle of network
+    lower_network <- network[lower.tri(network)]
+    
+    # Only add to existing edges
+    lower_network[lower_network != 0] <- lower_network[lower_network != 0] +
+      runif(
+        n = edges,
+        min = -0.10,
+        max = 0.10
+      )
+    
+    # Replace lower network
+    network[lower.tri(network)] <- lower_network
+    
+    # Replace upper network
+    network <- t(network)
+    network[lower.tri(network)] <- lower_network
+    
+  }
+  
+  # Set random proportion
+  proportion <- runif(1, min = min, max = max)
+  
+  # Obtain proportion of connections to change
+  rewire_number <- floor(edges * proportion)
+  
+  # Obtain edge list
+  lower_network <- network
+  lower_network[upper.tri(lower_network)] <- 0
+  edge_list <- which(lower_network != 0, arr.ind = TRUE)
+  
+  # Obtain edges to rewire
+  rewire_list <- edge_list[sample(
+    1:edges, rewire_number, replace = FALSE
+  ),]
+  
+  # Edges to replace
+  edge_list <- expand.grid.unique(
+    1:ncol(network), 1:ncol(network)
+  )
+  replace_list <- edge_list[sample(
+    1:nrow(edge_list), rewire_number, replace = FALSE
+  ),]
+  colnames(replace_list) <- c("row", "col")
+  
+  # Rewire edges
+  for(i in 1:nrow(rewire_list)){
+    
+    # Obtain row and column
+    row <- rewire_list[i, "row"]
+    column <- rewire_list[i, "col"]
+    
+    # Obtain replace row and column
+    replace_row <- replace_list[i, "row"]
+    replace_column <- replace_list[i, "col"]
+    
+    # Obtain values
+    original_value <- network[row, column]
+    replace_value <- network[replace_row, replace_column]
+    
+    # Swap values
+    network[replace_row, replace_column] <- original_value
+    network[replace_column, replace_row] <- original_value
+    network[row, column] <- replace_value
+    network[column, row] <- replace_value
+    
+  }
+  
+  # Return the rewired network
+  return(network)
+  
+}
+
+#%%%%%%%%%%%%%%%%%%%%
+# infoCluster ----
+#%%%%%%%%%%%%%%%%%%%%
+
+#' @noRd
+# Variation of information
+# Updated 30.07.2022
+vi <- function(wc1, wc2)
+{
+  
+  # Obtain non-NA memberships
+  nonNA <- !is.na(wc1) & !is.na(wc2)
+  wc1 <- wc1[nonNA]
+  wc2 <- wc2[nonNA]
+  
+  # Compute maximum VI
+  ## Set max memberships
+  max_wc1 <- rep(1, length(wc1))
+  max_wc2 <- 1:length(wc2)
+  max_wc2[length(max_wc2)] <- 1
+  max_vi <- igraph::compare(
+    max_wc1, max_wc2
+  )
+  
+  # Obtain variation of information
+  vi <- igraph::compare(
+    wc1, wc2, method = "vi"
+  )
+  
+  # Normalize VI by maximum value
+  vi <- vi / max_vi
+  
+  # Return
+  return(vi)
+  
+}
+
+#' @noRd
+# Root Mean Square Error (for matrices)
+# Updated 30.07.2022
+matrix_rmse <- function(matrix1, matrix2)
+{
+  # Check for symmetric
+  if(
+    isSymmetric(unname(as.matrix(matrix1))) &
+    isSymmetric(unname(as.matrix(matrix2)))
+  ){
+    
+    # Compute lower triangles
+    matrix1 <- matrix1[lower.tri(matrix1)]
+    matrix2 <- matrix2[lower.tri(matrix2)]
+    
+  }
+  
+  # Compute RMSE
+  rmse <- sqrt(mean((matrix1 - matrix2)^2, na.rm = TRUE))
+  
+  # Return RMSE
+  return(rmse)
+  
+}
+
+#' @noRd
+# Rescaled Laplacian matrix
+# Updated 30.07.2022
+rescaled_laplacian <- function(net)
+{
+  # Ensure diagonal is zero
+  diag(net) <- 0
+  
+  # Make network absolute
+  # net <- abs(net)
+  # net <- ifelse(net != 0, 1, 0)
+  
+  # Laplacian matrix
+  rescaled_L <- (diag(colSums(net)) - net) / sum(net)
+  
+  # Return
+  return(rescaled_L)
+  
+}
+
+#' @noRd
+# Von Neumann Entropy
+# Updated 06.07.2022
+vn_entropy <- function(L_mat)
+{
+  
+  # Eigenvalues
+  eigenvalues <- eigen(L_mat)$values
+  
+  # Von Neumann entropy
+  vn_entropy <- suppressWarnings(
+    -sum(eigenvalues * log2(eigenvalues), na.rm = TRUE)
+  )
+  
+  # Return
+  return(vn_entropy)
+  
+}
 
 #%%%%%%%%%%%%%%%%%%%%%%
 # SYSTEM FUNCTIONS ----

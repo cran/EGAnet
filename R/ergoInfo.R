@@ -1,19 +1,25 @@
 #' Ergodicity Information Index
+#'
 #' @description Computes the Ergodicity Information Index
 #'
-#' @param data A dynEGA.ind.pop object
+#' @param dynEGA.object A \code{\link[EGAnet]{dynEGA.ind.pop}} object
 #'
 #' @param use Character.
-#' A string indicating what network element will be used to compute the algorithm complexity, the list of edges or the weights of the network.
-#' Defaults to \code{use = "edge.list"}.
+#' A string indicating what network element will be used
+#' to compute the algorithm complexity, the list of edges or the weights of the network.
+#' Defaults to \code{use = "weighted"}.
 #' Current options are:
 #'
 #' \itemize{
 #'
-#' \item{\strong{\code{edge.list}}}
+#' \item{\strong{\code{"edge.list"}}}
 #' {Calculates the algorithm complexity using the list of edges.}
 #'
-#' \item{\strong{\code{weights}}}
+#' \item{\strong{\code{"unweighted"}}}
+#' {Calculates the algorithm complexity using the binary weights of the network.
+#' 0 = edge absent and 1 = edge present}
+#'
+#' \item{\strong{\code{"weighted"}}}
 #' {Calculates the algorithm complexity using the weights of the network.}
 #' }
 #'
@@ -27,216 +33,424 @@
 #'
 #' \item{Kcomp.pop}{The Kolmogorov complexity of the prime-weight encoded population network}
 #'
+#' \item{complexity}{The complexity metric proposed by Santora and Nicosia (2020)}
+#'
 #' \item{EII}{The Ergodicity Information Index}
 #'
-#' @author Hudson Golino <hfg9s at virginia.edu>
+#' @author Hudson Golino <hfg9s at virginia.edu> and Alexander Christensen <alexpaulchristensen@gmail.com>
 #'
+#' @examples
+#' # Obtain data
+#' sim.dynEGA <- sim.dynEGA # bypasses CRAN checks
+#'
+#' \donttest{# Dynamic EGA individual and population structure
+#' dyn.ega1 <- dynEGA.ind.pop(
+#'   data = sim.dynEGA, n.embed = 5, tau = 1,
+#'   delta = 1, id = 21, use.derivatives = 1,
+#'   ncores = 2, corr = "pearson"
+#' )
+#'
+#' # Compute empirical ergodicity information index
+#' eii <- ergoInfo(
+#'   dynEGA.object = dyn.ega1,
+#'   use = "weighted"
+#' )}
 #'
 #' @export
+#'
 # Ergodicity Information Index
-# Updated 04.27.2022
-ergoInfo <- function(data, use = c("edge.list", "weights")){
+# Updated 18.07.2022
+ergoInfo <- function(
+    dynEGA.object,
+    use = c(
+      "edge.list",
+      "unweighted",
+      "weighted"
+    )
+)
+{
 
-  #### MISSING ARGUMENTS HANDLING ####
-  if(missing(use))
-  {use <- "edge.list"
-  }else{use}
+  #### MISSING ARGUMENTS HANDLING
+  if(missing(use)){use <- "weighted"}
 
-  # dynEGA (Individual)
-  ids <- unique(data$Derivatives$EstimatesDF[,ncol(data$Derivatives$EstimatesDF)])
-  ids <- paste0("ID", ids)
-  # List of Individual Networks ----
-  net.list <- lapply(seq_along(ids), function(i){
-    res_list <- list()
-    res_list$IDs <- ids[i] # IDs
-    res_list$Network <- data$dynEGA.ind[[ids[i]]]$network # Networks
-    res_list$igraph.Network <- convert2igraph(res_list$Network) # igraph Network
-    res_list$gsize.net <- igraph::gsize(res_list$igraph.Network) # igraph Size
-    res_list$adj.net <- as.matrix(igraph::get.adjacency(res_list$igraph.Network, type="both"))
-    return(res_list)
-  })
-
-  gsize.net.vec <- unlist(
-    lapply(net.list, function(x){
-      x$gsize.net
-    })
-  )
-
-  # order by size:
-  mat.size <- data.frame(Ind = seq_along(ids), Size = gsize.net.vec)
-  mat.size <- mat.size[order(mat.size$Size, decreasing = FALSE),]
-
-  # Load deep learning neural network weights
-  prime.num <- get(data("prime.num", envir = environment()))
-
-  # Associate prime number:
-  mat.size$Prime <- prime.num[1:nrow(mat.size)]
-
-  # Organize by size:
-  net.list.ordered <- net.list[mat.size$Ind]
-
-  # Transforming the matrices into a grid (ncol and nrow = ID 1)
-  grid <- expand.grid(x = 1:ncol(net.list.ordered[[1]]$Network), y = 1:ncol(net.list.ordered[[1]]$Network))
-
-  # Computing the Prime-Weight Transformation
-  mat.encode.list <- lapply(seq_along(ids), function(i){
-
-    apply(grid, 1,function(x){
-      return(
-        ifelse(
-          net.list.ordered[[i]]$Network[x[1],x[2]]==0,
-          1,
-          (net.list.ordered[[i]]$adj.net[x[1], x[2]]*mat.size[i,"Prime"])^(net.list.ordered[[i]]$Network[x[1], x[2]])
-        )
+  # Check for class
+  if(!is(dynEGA.object, "dynEGA.ind.pop")){
+    stop(
+      paste(
+        "Input into the `dynEGA.object` argument's class is not `dynEGA.ind.pop`.\n\n",
+        "Class of dynEGA.object = ", paste(
+          class(dynEGA.object), sep = "", collapse = ", "
+        ),
+        sep = ""
       )
-    })
+    )
+  }
 
-  })
+  # Sort population- and individual-level outputs
+  dynEGA.pop <- dynEGA.object$dynEGA.pop
+  dynEGA.ind <- dynEGA.object$dynEGA.ind
 
-  encode <- Reduce("*", mat.encode.list)
-  mat.encode <- matrix(encode, ncol = ncol(net.list.ordered[[1]]$Network), nrow = nrow(net.list.ordered[[1]]$Network))
-  mat.encode <- ifelse(mat.encode==1, 0, mat.encode)
-  mat.encode.igraph <- convert2igraph(mat.encode)
-  edge.list.mat.encode <- igraph::get.edgelist(mat.encode.igraph)
+  # Remove Methods
+  if("Methods" %in% names(dynEGA.ind$dynEGA)){
+    dynEGA.ind$dynEGA <- dynEGA.ind$dynEGA[-which(names(dynEGA.ind$dynEGA) == "Methods")]
+  }
 
+  # Edge list
   if(use == "edge.list"){
 
+    # Obtain individual networks
+    individual_networks <- lapply(dynEGA.ind$dynEGA, function(x){x$network})
+
+    # Stack networks in an array
+    arrayed_networks <- simplify2array(individual_networks)
+
+    # Obtain edges from networks
+    edges <- apply(arrayed_networks, 1:2, sum) != 0
+
+    # Make upper triangle equal FALSE
+    edges[upper.tri(edges)] <- FALSE
+
+    # Obtain edge list
+    edge_list <- which(edges, arr.ind = TRUE)
+
+    # Set number of edges (10^3 based on Santora & Nicosia, 2020)
     iter <- 1:1000
 
-    bits <- lapply(iter, function(i){
-      toString(edge.list.mat.encode[sample(1:nrow(edge.list.mat.encode), size = nrow(edge.list.mat.encode), replace = TRUE)])
+    # Obtain bits
+    individual_bits <- lapply(iter, function(i){
+      toString(edge_list[
+        sample(
+          1:nrow(edge_list),
+          size = nrow(edge_list),
+          replace = TRUE
+        ),
+      ])
     })
 
-    compression <- lapply(iter, function(i){
-      memCompress(bits[[i]], "gzip")
+    # Compress bits
+    individual_compression <- lapply(iter, function(i){
+      memCompress(individual_bits[[i]], "gzip")
     })
 
-    kcomp <- lapply(iter, function(i){
-      length(compression[[i]])
+    # Obtain complexity
+    individual_kcomp <- lapply(iter, function(i){
+      length(individual_compression[[i]])
     })
 
-  }else{
+    # Obtain population network
+    population_network <- dynEGA.pop$dynEGA$network
 
-    edge.list.mat.encode2 <- edge.list.mat.encode
+    # Obtain edges from networks
+    population_edges <- population_network != 0
 
-    edge.list.mat.encode2 <- cbind(edge.list.mat.encode2, NA)
+    # Make upper triangle equal FALSE
+    population_edges[upper.tri(population_edges)] <- FALSE
 
-    for(i in 1:nrow(edge.list.mat.encode2)){
-      edge.list.mat.encode2[i,3] <- mat.encode[edge.list.mat.encode2[i,1],edge.list.mat.encode2[i,2]]
-    }
+    # Obtain edge list
+    population_edge_list <- which(population_edges, arr.ind = TRUE)
 
+    # Obtain bits
+    population_bits <- lapply(iter, function(i){
+      toString(population_edge_list[
+        sample(
+          1:nrow(population_edge_list),
+          size = nrow(population_edge_list),
+          replace = TRUE
+        ),
+      ])
+    })
+
+    # Compress bits
+    population_compression <- lapply(iter, function(i){
+      memCompress(population_bits[[i]], "gzip")
+    })
+
+    # Obtain complexity
+    population_kcomp <- lapply(iter, function(i){
+      length(population_compression[[i]])
+    })
+
+    # Kolmogorov Complexity:
+    results <- list()
+    results$KComp <- mean(unlist(individual_kcomp))
+    results$KComp.pop <- mean(unlist(population_kcomp))
+    results$complexity <- results$KComp / results$KComp.pop
+    results$EII  <- sqrt(dynEGA.pop$dynEGA$n.dim)^((results$KComp/results$KComp.pop)/log(nrow(population_edge_list)))
+    results$use <- use
+    class(results) <- "EII"
+
+  }else if(use == "unweighted"){
+
+    # Obtain individual networks
+    individual_networks <- lapply(dynEGA.ind$dynEGA, function(x){x$network})
+
+    # Obtain adjacency matrices
+    individual_adjacency <- lapply(individual_networks, function(x){
+      ifelse(x != 0, 1, 0)
+    })
+
+    # Obtain number of edges
+    edge_count <- unlist(lapply(individual_adjacency, function(x){sum(x) / 2}))
+
+    # Order networks and adjacency matrices by size
+    ordering <- order(edge_count, decreasing = FALSE)
+    individual_networks <- individual_networks[ordering]
+    individual_adjacency <- individual_adjacency[ordering]
+
+    # Obtain prime numbers
+    prime.num <- get(data(
+      "prime.num",
+      package = "EGAnet",
+      envir = environment()
+    ))
+
+    # Get prime numbers equal to networks
+    prime_numbers <- prime.num[1:length(individual_networks)]
+
+    # Obtain prime weights
+    prime_weights <- lapply(seq_along(individual_networks), function(i){
+
+      # Assign prime
+      prime_network <- individual_adjacency[[i]] * prime_numbers[i]
+
+      # Assign 1s to 0s
+      prime_network <- ifelse(prime_network == 0, 1, prime_network)
+
+    })
+
+    # Reduce to encoding matrix
+    encoding_matrix <- Reduce("*", prime_weights)
+
+    # Make 1 encodings 0
+    encoding_matrix <- ifelse(encoding_matrix == 1, 0, encoding_matrix)
+
+    # Obtain edges from encoding matrix
+    edges <- encoding_matrix != 0
+
+    # Make upper triangle equal FALSE
+    edges[upper.tri(edges)] <- FALSE
+
+    # Obtain edge list
+    edge_list <- as.data.frame(which(edges, arr.ind = TRUE))
+    edge_list$weight <- encoding_matrix[edges]
+
+    # Set number of edges (10^3 based on Santora & Nicosia, 2020)
     iter <- 1:1000
 
-    bits <- lapply(iter, function(i){
-      toString(edge.list.mat.encode2[sample(1:nrow(edge.list.mat.encode2), size = nrow(edge.list.mat.encode2), replace = TRUE),3])
+    # Obtain bits
+    individual_bits <- lapply(iter, function(i){
+      toString(edge_list$weight[
+        sample(
+          1:nrow(edge_list),
+          size = nrow(edge_list),
+          replace = TRUE
+        )
+      ])
     })
 
-    compression <- lapply(iter, function(i){
-      memCompress(bits[[i]], "gzip")
+    # Compress bits
+    individual_compression <- lapply(iter, function(i){
+      memCompress(individual_bits[[i]], "gzip")
     })
 
-    kcomp <- lapply(iter, function(i){
-      length(compression[[i]])
+    # Obtain complexity
+    individual_kcomp <- lapply(iter, function(i){
+      length(individual_compression[[i]])
     })
+
+    # Obtain population network
+    population_network <- dynEGA.pop$dynEGA$network
+
+    # Obtain population adjacency
+    population_adjacency <- ifelse(population_network != 0, 1, 0)
+
+    # Obtain prime matrix
+    population_prime <- population_adjacency * encoding_matrix
+
+    # Obtain edges from networks
+    population_edges <- population_network != 0
+
+    # Make upper triangle equal FALSE
+    population_edges[upper.tri(population_edges)] <- FALSE
+
+    # Obtain edge list
+    population_edge_list <- as.data.frame(which(population_edges, arr.ind = TRUE))
+    population_edge_list$weight <- population_prime[population_edges]
+
+    # Set number of edges (10^3 based on Santora & Nicosia, 2020)
+    iter <- 1:1000
+
+    # Obtain bits
+    population_bits <- lapply(iter, function(i){
+      toString(population_edge_list$weight[
+        sample(
+          1:nrow(population_edge_list),
+          size = nrow(population_edge_list),
+          replace = TRUE
+        )
+      ])
+    })
+
+    # Compress bits
+    population_compression <- lapply(iter, function(i){
+      memCompress(population_bits[[i]], "gzip")
+    })
+
+    # Obtain complexity
+    population_kcomp <- lapply(iter, function(i){
+      length(population_compression[[i]])
+    })
+
+    # Kolmogorov Complexity:
+    results <- list()
+    results$KComp <- mean(unlist(individual_kcomp))
+    results$KComp.pop <- mean(unlist(population_kcomp))
+    results$complexity <- results$KComp / results$KComp.pop
+    results$EII  <- sqrt(dynEGA.pop$dynEGA$n.dim)^((results$KComp/results$KComp.pop)/log(nrow(population_edge_list)))
+    results$use <- use
+    class(results) <- "EII"
+
+
+  }else if(use == "weighted"){
+
+    # Obtain individual networks
+    individual_networks <- lapply(dynEGA.ind$dynEGA, function(x){x$network})
+
+    # Obtain adjacency matrices
+    individual_adjacency <- lapply(individual_networks, function(x){
+      ifelse(x != 0, 1, 0)
+    })
+
+    # Obtain number of edges
+    edge_count <- unlist(lapply(individual_adjacency, function(x){sum(x) / 2}))
+
+    # Order networks and adjacency matrices by size
+    ordering <- order(edge_count, decreasing = FALSE)
+    individual_networks <- individual_networks[ordering]
+    individual_adjacency <- individual_adjacency[ordering]
+
+    # Obtain prime numbers
+    prime.num <- get(data(
+      "prime.num",
+      package = "EGAnet",
+      envir = environment()
+    ))
+
+    # Get prime numbers equal to networks
+    prime_numbers <- prime.num[1:length(individual_networks)]
+
+    # Obtain prime weights
+    prime_weights <- lapply(seq_along(individual_networks), function(i){
+
+      # Assign prime
+      prime_network <- individual_adjacency[[i]] * prime_numbers[i]
+
+      # Assign 1s to 0s
+      prime_network <- ifelse(prime_network == 0, 1, prime_network)
+
+      # Raise to weight power
+      power_prime_network <- prime_network^individual_networks[[i]]
+
+    })
+
+    # Reduce to encoding matrix
+    encoding_matrix <- Reduce("*", prime_weights)
+
+    # Make 1 encodings 0
+    encoding_matrix <- ifelse(encoding_matrix == 1, 0, encoding_matrix)
+
+    # Obtain edges from encoding matrix
+    edges <- encoding_matrix != 0
+
+    # Make upper triangle equal FALSE
+    edges[upper.tri(edges)] <- FALSE
+
+    # Obtain edge list
+    edge_list <- as.data.frame(which(edges, arr.ind = TRUE))
+    edge_list$weight <- encoding_matrix[edges]
+
+    # Set number of edges (10^3 based on Santora & Nicosia, 2020)
+    iter <- 1:1000
+
+    # Obtain bits
+    individual_bits <- lapply(iter, function(i){
+      toString(edge_list$weight[
+        sample(
+          1:nrow(edge_list),
+          size = nrow(edge_list),
+          replace = TRUE
+        )
+      ])
+    })
+
+    # Compress bits
+    individual_compression <- lapply(iter, function(i){
+      memCompress(individual_bits[[i]], "gzip")
+    })
+
+    # Obtain complexity
+    individual_kcomp <- lapply(iter, function(i){
+      length(individual_compression[[i]])
+    })
+
+    # Obtain population network
+    population_network <- dynEGA.pop$dynEGA$network
+
+    # Obtain population adjacency
+    population_adjacency <- ifelse(population_network != 0, 1, 0)
+
+    # Obtain prime matrix
+    population_prime <- (population_adjacency * encoding_matrix)^population_network
+
+    # Obtain edges from networks
+    population_edges <- population_network != 0
+
+    # Make upper triangle equal FALSE
+    population_edges[upper.tri(population_edges)] <- FALSE
+
+    # Obtain edge list
+    population_edge_list <- as.data.frame(which(population_edges, arr.ind = TRUE))
+    population_edge_list$weight <- population_prime[population_edges]
+
+    # Set number of edges (10^3 based on Santora & Nicosia, 2020)
+    iter <- 1:1000
+
+    # Obtain bits
+    population_bits <- lapply(iter, function(i){
+      toString(population_edge_list$weight[
+        sample(
+          1:nrow(population_edge_list),
+          size = nrow(population_edge_list),
+          replace = TRUE
+        )
+      ])
+    })
+
+    # Compress bits
+    population_compression <- lapply(iter, function(i){
+      memCompress(population_bits[[i]], "gzip")
+    })
+
+    # Obtain complexity
+    population_kcomp <- lapply(iter, function(i){
+      length(population_compression[[i]])
+    })
+
+    # Kolmogorov Complexity:
+    results <- list()
+    results$KComp <- mean(unlist(individual_kcomp))
+    results$KComp.pop <- mean(unlist(population_kcomp))
+    results$complexity <- results$KComp / results$KComp.pop
+    results$EII  <- sqrt(dynEGA.pop$dynEGA$n.dim)^((results$KComp/results$KComp.pop)/log(
+      # nrow(population_edge_list)
+      sum(encoding_matrix != 0) / 2
+      # ^^ used in Santoro and Nicosia (2020)
+    ))
+    results$use <- use
+    class(results) <- "EII"
 
   }
 
-  # List of Population Networks ----
-  net.list.pop <- lapply(1, function(i){
-    res_list <- list()
-    res_list$IDs <- i # ID
-    res_list$Network <- data$dynEGA.pop$network # Network
-    res_list$igraph.Network <- convert2igraph(res_list$Network) # igraph Network
-    res_list$gsize.net <- igraph::gsize(res_list$igraph.Network) # igraph Size
-    res_list$adj.net <- as.matrix(igraph::get.adjacency(res_list$igraph.Network,type="both"))
-    return(res_list)
-  })
-
-  gsize.net.vec.pop <- net.list.pop[[1]]$gsize.net
-
-  # order by size:
-  mat.size.pop <- data.frame(Ind = 1, Size = gsize.net.vec.pop)
-  mat.size.pop <- mat.size.pop[order(mat.size.pop$Size, decreasing = FALSE),]
-
-  # Associate prime number:
-  mat.size.pop$Prime <- prime.num[1:nrow(mat.size.pop)]
-
-  # Organize by size:
-  net.list.ordered.pop <- net.list.pop[mat.size.pop$Ind]
-
-  # Transforming the matrices into a grid (ncol and nrow = ID 1)
-  grid.pop <- expand.grid(x = 1:ncol(net.list.ordered.pop[[1]]$Network), y = 1:ncol(net.list.ordered.pop[[1]]$Network))
-
-  # Computing the Prime-Weight Transformation
-  mat.encode.list.pop <- lapply(1, function(i){
-    apply(grid.pop, 1 , function(x){
-      return(
-        ifelse(
-          net.list.ordered.pop[[i]]$Network[x[1], x[2]]==0,
-          1,
-          (net.list.ordered.pop[[i]]$adj.net[x[1], x[2]]*mat.size.pop[i,"Prime"])^(net.list.ordered.pop[[i]]$Network[x[1], x[2]])
-        )
-      )
-    })
-  })
-
-  encode.pop <- Reduce("*", mat.encode.list.pop)
-  mat.encode.pop <- matrix(encode.pop, ncol = ncol(net.list.ordered.pop[[1]]$Network), nrow = nrow(net.list.ordered.pop[[1]]$Network))
-  mat.encode.pop <- ifelse(mat.encode.pop==1, 0, mat.encode.pop)
-  mat.encode.igraph.pop <- convert2igraph(mat.encode.pop)
-  edge.list.mat.encode.pop <- igraph::get.edgelist(mat.encode.igraph.pop)
-
-  if(use == "edge.list"){
-
-    iter <- 1:1000
-
-    bits.pop <- lapply(iter, function(i){
-      toString(edge.list.mat.encode.pop[sample(1:nrow(edge.list.mat.encode.pop), size = nrow(edge.list.mat.encode.pop), replace = TRUE)])
-    })
-
-    compression.pop <- lapply(iter, function(i){
-      memCompress(bits.pop[[i]], "gzip")
-    })
-
-    kcomp.pop <- lapply(iter, function(i){
-      length(compression.pop[[i]])
-    })
-
-  }else{
-
-    edge.list.mat.encode.pop2 <- edge.list.mat.encode.pop
-
-    edge.list.mat.encode.pop2 <- cbind(edge.list.mat.encode.pop2, NA)
-
-    for(i in 1:nrow(edge.list.mat.encode.pop2)){
-      edge.list.mat.encode.pop2[i,3] <- mat.encode.pop[edge.list.mat.encode.pop2[i,1],edge.list.mat.encode.pop2[i,2]]
-    }
-
-    iter <- 1:1000
-
-    bits.pop <- lapply(iter, function(i){
-      toString(edge.list.mat.encode.pop2[sample(1:nrow(edge.list.mat.encode.pop2), size = nrow(edge.list.mat.encode.pop2), replace = TRUE),3])
-    })
-
-    compression.pop <- lapply(iter, function(i){
-      memCompress(bits.pop[[i]], "gzip")
-    })
-
-    kcomp.pop <- lapply(iter, function(i){
-      length(compression.pop[[i]])
-    })
-
-  }
-
-  # Kolmogorov Complexity:
-  results <- list()
-  results$PrimeWeight <- mat.encode
-  results$PrimeWeight.pop <- mat.encode.pop
-  results$KComp <- mean(unlist(kcomp))
-  results$KComp.pop <- mean(unlist(kcomp.pop))
-
-  ergo.info.index<- sqrt(data$dynEGA.pop$n.dim)^((results$KComp.pop/results$KComp)/log(sum(!results$PrimeWeight.pop==0)))
-  results$EII <- ergo.info.index
   return(results)
 }
 #----

@@ -8,48 +8,35 @@
 \alias{plot.dynEGA.Groups}
 \alias{plot.dynEGA.Individuals}
 \alias{plot.EGA}
-\alias{plot.NetLoads}
 \title{S3Methods for Plotting}
 \usage{
-\method{plot}{bootEGA}(x, plot.type = c("GGally", "qgraph"),
+\method{plot}{bootEGA}(x, title = "",
 plot.args = list(), produce = TRUE, ...)
 
 \method{plot}{CFA}(x, layout = "spring", vsize = 6, ...)
 
-\method{plot}{dynEGA}(x, title = "", plot.type = c("GGally", "qgraph"),
+\method{plot}{dynEGA}(x, title = "",
 plot.args = list(), produce = TRUE, ...)
 
 \method{plot}{dynEGA.Groups}(x, ncol, nrow, title = "",
-plot.type = c("GGally", "qgraph"), plot.args = list(), produce = TRUE, ...)
+plot.args = list(), produce = TRUE, ...)
 
 \method{plot}{dynEGA.Individuals}(x, title = "",  id = NULL,
-plot.type = c("GGally", "qgraph"), plot.args = list(), produce = TRUE, ...)
+plot.args = list(), produce = TRUE, ...)
 
-\method{plot}{EGA}(x, title = "", plot.type = c("GGally", "qgraph"),
+\method{plot}{EGA}(x, title = "",
 plot.args = list(), produce = TRUE,  ...)
-
-\method{plot}{NetLoads}(x, ...)
 }
 \arguments{
 \item{x}{Object from \code{EGAnet} package}
 
-\item{plot.type}{Character.
-Plot system to use.
-Current options are \code{\link[qgraph]{qgraph}} and \code{\link{GGally}}.
-Defaults to \code{"GGally"}.}
+\item{title}{Character.
+Title of the plot.
+Defaults to \code{""}}
 
 \item{plot.args}{List.
-A list of additional arguments for the network plot.
-For \code{plot.type = "qgraph"}:
-
-\itemize{
-
-\item{\strong{\code{vsize}}}
-{Size of the nodes. Defaults to 6.}
-
-}
-For \code{plot.type = "GGally"} (see \code{\link[GGally]{ggnet2}} for
-full list of arguments):
+A list of additional arguments for the network plot. See 
+\code{\link[GGally]{ggnet2}} for full list of arguments:
 
 \itemize{
 
@@ -85,9 +72,6 @@ Defaults to \code{TRUE}}
 
 \itemize{
 
-\item{\code{\link[qgraph]{qgraph}}}
-{Functions: bootEGA, dynEGA, dynEGA.Groups, dynEGA.Individuals, EGA, and net.loads}
-
 \item{\code{\link[semPlot]{semPaths}}}
 {Functions: CFA}
 
@@ -106,10 +90,6 @@ Number of columns}
 
 \item{nrow}{Numeric.
 Number of rows}
-
-\item{title}{Character.
-Title of the plot.
-Defaults to \code{""}}
 
 \item{id}{Numeric.
 An integer or character indicating the ID of the individual to plot}

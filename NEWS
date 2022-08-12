@@ -1,6 +1,37 @@
+Changes in version 1.2.0
+
+o FIX: hex codes used in EGA plots
+
+o FIX: `ordered = TRUE` for categorical data in *lavaan* CFAs
+
+o UPDATE: consesnsus clustering is now used with Louvain in `EGA`
+
+o UPDATE: print/summary S3methods have been standardized
+
+o ADD/UPDATE: `boot.ergoInfo` has achieved functional working order. Results can be trusted to suggest whether dynamic data possess the ergodic property
+
+o ADD: information theoretic clustering algorithm for dynamic data is available in `infoCluster`
+
+o REMOVE: "alpha" and "adapt" options in `UVA` (removes {fitdistrplus} dependency)
+
+o REMOVE: {qgraph} plots are no longer available
+
+o ADD: `convert2igraph` is now a core function
+
+o ADD: Jensen-Shannon Divergence `jsd` for determining (dis)similarity between network strcutures
+
+o ADD: `riEGA`, `EGA.fit`, and `hierEGA` functionality to `bootEGA`
+
+o ADD: `hierEGA` functionality to `itemStability` and `dimensionStability`
+
+o UPDATE: "louvain" algorithm used as default for unidimensionality check in `EGA`
+
+o INTERNAL: cleaned up `EGA` and `EGA.estimate`; streamlined code; no user facing differences
+
+
 Changes in version 1.1.0
 
-o FIX: note when if(class(object)). Replaced by if(is(object)).
+o FIX: CRAN note when `if(class(object))`. Replaced by `if(is(object))`.
 
 o FIX: bug in `EGA.estimate` when using the TMFG network method. The resulting EGA plot did not have the correct node names.
 
@@ -8,7 +39,7 @@ o FIX: bug in `UVA` when trying to use sum score (`reduce.method = "sum"`) in au
 
 o ADD: measurement `invariance` function for testing differences in network loadings between groups
 
-o UPDATE:  `itemStability` now has a parameter `structure` in which the user can specify a given structure to test its stability.
+o UPDATE: `itemStability` now has a parameter `structure` in which the user can specify a given structure to test its stability.
 
 o ADD: `riEGA` implementing random-intercept EGA for wording effects
 
@@ -23,9 +54,9 @@ Changes in version 1.0.0
 
 o FIX: bug within the bootEGA function for `type = "resampling"`.
 
-o **UPDATE**: default undimensionality adjustment has changed to leading eigenvalue (see Christensen, Garrido, & Golino, 2021 <https://doi.org/10.31234/osf.io/hz89e>). Previous unidimensionality adjustment in versions <= 0.9.8 can be applied using `uni.method = "expand"`
+o UPDATE: default undimensionality adjustment has changed to leading eigenvalue (see Christensen, Garrido, & Golino, 2021 <https://doi.org/10.31234/osf.io/hz89e>). Previous unidimensionality adjustment in versions <= 0.9.8 can be applied using `uni.method = "expand"`
 
-O **UPDATE**: default `UVA` was changed `type = "threshold"`
+o UPDATE: default `UVA` was changed `type = "threshold"`
 
 o UPDATE: `UVA` is now automated using `auto = TRUE`
 

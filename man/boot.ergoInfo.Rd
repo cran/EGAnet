@@ -4,120 +4,18 @@
 \alias{boot.ergoInfo}
 \title{Bootstrap Test for the Ergodicity Information Index}
 \usage{
-boot.ergoInfo(
-  dynEGA.pop,
-  iter,
-  EII,
-  use,
-  embed,
-  tau,
-  delta,
-  derivatives,
-  model,
-  model.args = list(),
-  algorithm = c("walktrap", "louvain"),
-  algorithm.args = list(),
-  corr,
-  ncores,
-  ...
-)
+boot.ergoInfo(dynEGA.object, EII, iter = 100, ncores)
 }
 \arguments{
-\item{dynEGA.pop}{A dynEGA or a dynEGA.pop.ind object.}
+\item{dynEGA.object}{A \code{\link[EGAnet]{dynEGA}} or a
+\code{\link[EGAnet]{dynEGA.ind.pop}} object that is used to match the arguments of the EII object.}
+
+\item{EII}{A \code{\link[EGAnet]{ergoInfo}} object, used to estimate the Empirical Ergodicity Information Index, or the estimated value of EII estimated
+using the \code{\link[EGAnet]{ergoInfo}} function. Inherits \code{use} from \code{\link[EGAnet]{ergoInfo}}}
 
 \item{iter}{Numeric integer.
-Number of random samples to generate in the Monte-Carlo simulation.
-At least \code{500} is recommended}
-
-\item{EII}{Numeric.
-Empirical Ergodicity Information Index obtained via the \code{\link[EGAnet]{ergoInfo}} function.}
-
-\item{use}{Character.
-A string indicating what network element will be used to compute the algorithm complexity in the \code{\link[EGAnet]{ergoInfo}} function,
-the list of edges or the weights of the network.
-Defaults to \code{use = "edge.list"}.
-Current options are:
-
-\itemize{
-
-\item{\strong{\code{edge.list}}}
-{Calculates the algorithm complexity using the list of edges.}
-
-\item{\strong{\code{weights}}}
-{Calculates the algorithm complexity using the weights of the network.}
-}}
-
-\item{embed}{Integer.
-Number of embedded dimensions (the number of observations to be used in the \code{\link[EGAnet]{Embed}} function). For example,
-an \code{"embed = 5"} will use five consecutive observations to estimate a single derivative.
-Default is \code{"embed = 5"}.}
-
-\item{tau}{Integer.
-Number of observations to offset successive embeddings in the \code{\link[EGAnet]{Embed}} function. A tau of one uses adjacent observations.
-Default is \code{"tau = 1"}.}
-
-\item{delta}{Integer.
-The time between successive observations in the time series.
-Default is \code{"delta = 1"}.}
-
-\item{derivatives}{Integer.
-The order of the derivative to be used in the EGA procedure. Default to 1.}
-
-\item{model}{Character.
-A string indicating the method to use. Defaults to \code{glasso}.
-Current options are:
-
-\itemize{
-
-\item{\strong{\code{glasso}}}
-{Estimates the Gaussian graphical model using graphical LASSO with
-extended Bayesian information criterion to select optimal regularization parameter.
-This is the default method}
-
-\item{\strong{\code{TMFG}}}
-{Estimates a Triangulated Maximally Filtered Graph}
-
-}}
-
-\item{model.args}{List.
-A list of additional arguments for \code{\link[EGAnet]{EBICglasso.qgraph}}
-or \code{\link[EGAnet]{TMFG}}}
-
-\item{algorithm}{A string indicating the algorithm to use or a function from \code{\link{igraph}}
-
-Current options are:
-
-\itemize{
-
-\item{\strong{\code{walktrap}}}
-{Computes the Walktrap algorithm using \code{\link[igraph]{cluster_walktrap}}}
-
-\item{\strong{\code{louvain}}}
-{Computes the Walktrap algorithm using \code{\link[igraph]{cluster_louvain}}}
-
-}}
-
-\item{algorithm.args}{List.
-A list of additional arguments for \code{\link[igraph]{cluster_walktrap}}, \code{\link[igraph]{cluster_louvain}},
-or some other community detection algorithm function (see examples)}
-
-\item{corr}{Type of correlation matrix to compute. The default uses \code{\link[qgraph]{cor_auto}}.
-Current options are:
-
-\itemize{
-
-\item{\strong{\code{cor_auto}}}
-{Computes the correlation matrix using the \code{\link[qgraph]{cor_auto}} function from
-\code{\link[qgraph]{qgraph}}}.
-
-\item{\strong{\code{pearson}}}
-{Computes Pearson's correlation coefficient using the pairwise complete observations via
-the \code{\link[stats]{cor}}} function.
-
-\item{\strong{\code{spearman}}}
-{Computes Spearman's correlation coefficient using the pairwise complete observations via
-the \code{\link[stats]{cor}}} function.
-}}
+Number of replica samples to generate from the bootstrap analysis.
+At least \code{100} is recommended}
 
 \item{ncores}{Numeric.
 Number of cores to use in computing results.
@@ -128,50 +26,69 @@ Recommended to use maximum number of cores minus one
 
 If you're unsure how many cores your computer has,
 then use the following code: \code{parallel::detectCores()}}
-
-\item{...}{Additional arguments.
-Used for deprecated arguments from previous versions of \code{\link{EGA}}}
 }
 \value{
 Returns a list containing:
 
-\item{boot.ergoInfo}{The values of the Ergodicity Information Index obtained in the Monte-Carlo Simulation}
+\item{boot.ergoInfo}{The values of the Ergodicity Information Index obtained in the bootstrap}
 
-\item{p.value.twosided}{The p-value of the Monte-Carlo test for the Ergodicity Information Index.
-The null hypothesis is that the empirical Ergodicity Information index is equal to the expected value of the EII if the all individuals
-had similar latent structures.}
+\item{p.value}{The two-sided *p*-value of the bootstrap test for the Ergodicity Information Index.
+The null hypothesis is that the empirical Ergodicity Information index is equal to the expected value of the EII
+with small variation in the population structure}
 
-\item{effect}{Indicates wheter the empirical EII is greater or less then the Monte-Carlo obtained EII.}
+\item{effect}{Indicates wheter the empirical EII is greater or less then the bootstrap distribution of EII.}
+
+\item{interpretation}{How you can interpret the result of the test in plain English}
 
 \item{plot.dist}{Histogram of the bootstrapped ergodicity information index}
+
+\item{methods}{Methods to report for print/summary S3methods and automated Methods section}
 }
 \description{
-Computes a parametric Bootstrap Test for the Ergodicity Information Index, comparing the
-empirical Ergodicity Information index to values obtained in data generated using \code{N} parametric bootstraps of the correlation matrix estimated using the
-\code{\link[EGAnet]{dynEGA}} function, for the population structure. The p-values in the bootstrap test can be calculated as \code{(sum(EII>=boot.EII)+1)/(iter+1)} and as
-\code{(sum(EII<=boot.EII)+1)/(iter+1)}, where EII is the empirical Ergodicity Information Index, boot.EII is the values of the Ergodicity Information Index obtained
-in the bootstraped samples, and \code{iter} is the number of random samples generated in the simulation. The two-sided p-value is computed as two times the lowest p-value. In the bootstrap Test for the Ergodicity Information Index,
-the null hypothesis is that the empirical value of EII is equal to the values of EII obtained in multiple individuals with the same structure as the population structure estimated
-via \code{\link[EGAnet]{dynEGA}}.
-Small values of p indicate that is very unlikely to obtain an EII as large as the one obtained in the empirical sample if the null hypothesis is true (i.e. all individuals have the same structure as the population structure), thus there is convincing evidence that the empirical Ergodicity Information Index is
-different than it could be expected if all individuals had a similar latent structure.
+Tests the Ergodicity Information Index obtained in the empirical sample with a distribution of EII 
+obtained by bootstrap sampling. In traditional bootstrap sampling, individual participants are resampled with
+replacement from the empirical sample. This process is time consuming when carried out across \emph{v} number
+of variables, \emph{n} number of participants, \emph{t} number of time points, and \emph{i} number of iterations.
+
+A more efficient process, the approach applied here, is to obtain a sampling distribution of EII values as if
+all participants in the data have the population network structure. Sampling is not perfect and therefore
+random noise is added to the edges of the population structure to simulate sampling variability. This noise
+follows a random uniform distribution ranging from -0.10 to 0.10. In addition, a proportion of edges are
+rewired to allow for slight variations on the population structure. The proportion of nodes that are rewired
+is sampled from a random uniform distribution between 0.10 to 0.40. This process is carried out for each
+participant resulting in \emph{n} variations of the population structure. Afterward, EII is computed. This
+process is carried out for \emph{i} iterations (e.g., 100).
+
+The result is a sampling distribution of EII values that would be expected if the process was ergodic. If
+the empirical EII value is significantly less than the distribution or not significantly different, then 
+the empirical data can be expected to be generated from an ergodic process and the population structure is 
+sufficient to describe all individuals. If the empirical EII value is significantly greater than the distribution,
+then the empirical data cannot be described by the population structure -- significant information is lost when
+collapsing across to the population structure.
 }
 \examples{
+\donttest{# Dynamic EGA individual and population structures
+dyn1 <- dynEGA.ind.pop(
+  data = sim.dynEGA[,-c(22)], n.embed = 5, tau = 1,
+  delta = 1, id = 21, use.derivatives = 1,
+  model = "glasso", ncores = 2, corr = "pearson"
+)
 
-\dontrun{
-\donttest{
-dyn1 <- dynEGA.ind.pop(data = sim.dynEGA[,-c(22)], n.embed = 5, tau = 1,
-                      delta = 1, id = 21, use.derivatives = 1,
-                    model = "glasso", ncores = 2, corr = "pearson")
+# Empirical Ergodicity Information Index
+eii1 <- ergoInfo(dynEGA.object = dyn1, use = "weighted")
 
-eii1 <- ergoInfo(data = dyn1)$EII
-
-testing.ergoinfo <- boot.ergoInfo(dynEGA.pop = dyn1, iter = 10,EII = eii1,
-embed = 5, tau = 1, delta = 1, derivatives = 1,
-model = "glasso", ncores = 2, corr = "pearson")
-}}
+# Bootstrap Test for Ergodicity Information Index
+testing.ergoinfo <- boot.ergoInfo(
+  dynEGA.object = dyn1, EII = eii1,
+  ncores = 2
+)}
 
 }
+\references{
+Golino, H., Nesselroade, J., & Christensen, A. P. (2022).
+Toward a psychology of individuals: The ergodicity information index and a bottom-up approach for finding generalizations.
+\emph{PsyArXiv}.
+}
 \author{
-Hudson Golino <hfg9s at virginia.edu>
+Hudson Golino <hfg9s at virginia.edu> & Alexander P. Christensen <alexander.christensen at Vanderbilt.Edu>
 }

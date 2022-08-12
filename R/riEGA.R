@@ -17,7 +17,7 @@
 #' 
 #' @param uni.method Character.
 #' What unidimensionality method should be used? 
-#' Defaults to \code{"LE"}.
+#' Defaults to \code{"louvain"}.
 #' Current options are:
 #' 
 #' \itemize{
@@ -30,11 +30,17 @@
 #' \emph{Psychological Methods} simulation.}
 #'
 #' \item{\strong{\code{LE}}}
-#' {Applies the leading eigenvalue algorithm (\code{\link[igraph]{cluster_leading_eigen}})
+#' {Applies the Leading Eigenvalue algorithm (\code{\link[igraph]{cluster_leading_eigen}})
 #' on the empirical correlation matrix. If the number of dimensions is 1,
-#' then the leading eigenvalue solution is used; otherwise, regular EGA
+#' then the Leading Eigenvalue solution is used; otherwise, regular EGA
 #' is used. This is the final method used in the Christensen, Garrido,
 #' and Golino (2021) simulation.}
+#' 
+#' \item{\strong{\code{louvain}}}
+#' {Applies the Louvain algorithm (\code{\link[igraph]{cluster_louvain}})
+#' on the empirical correlation matrix using a resolution parameter = 0.95.
+#' If the number of dimensions is 1, then the Louvain solution is used; otherwise,
+#' regular EGA is used. This method was validated in the Christensen (2022) simulation.}
 #' 
 #' }
 #' 
@@ -74,7 +80,7 @@
 #'
 #' @param model.args List.
 #' A list of additional arguments for \code{\link[EGAnet]{EBICglasso.qgraph}}
-#' or \code{\link[NetworkToolbox]{TMFG}}
+#' or \code{TMFG}
 #'
 #' @param algorithm A string indicating the algorithm to use or a function from \code{\link{igraph}}
 #' Defaults to \code{"walktrap"}.
@@ -94,14 +100,43 @@
 #' A list of additional arguments for \code{\link[igraph]{cluster_walktrap}}, \code{\link[igraph]{cluster_louvain}},
 #' or some other community detection algorithm function (see examples)
 #'
+#' @param consensus.iter Numeric.
+#' Number of iterations to perform in consensus clustering for the Louvain algorithm
+#' (see Lancichinetti & Fortunato, 2012).
+#' Defaults to \code{100}
+#' 
+#' @param consensus.method Character.
+#' What consensus clustering method should be used? 
+#' Defaults to \code{"highest_modularity"}.
+#' Current options are:
+#' 
+#' \itemize{
+#' 
+#' \item{\strong{\code{highest_modularity}}}
+#' {Uses the community solution that achieves the highest modularity
+#' across iterations}
+#' 
+#' \item{\strong{\code{most_common}}}
+#' {Uses the community solution that is found the most
+#' across iterations}
+#' 
+#' \item{\strong{\code{iterative}}}
+#' {Identifies the most common community solutions across iterations
+#' and determines how often nodes appear in the same community together.
+#' A threshold of 0.30 is used to set low proportions to zero.
+#' This process repeats iteratively until all nodes have a proportion of
+#' 1 in the community solution.
+#' }
+#' 
+#' \item{\code{lowest_tefi}}
+#' {Uses the community solution that achieves the lowest \code{\link[EGAnet]{tefi}}
+#' across iterations}
+#' 
+#' }
+#'
 #' @param plot.EGA Boolean.
 #' If \code{TRUE}, returns a plot of the network and its estimated dimensions.
 #' Defaults to \code{TRUE}
-#'
-#' @param plot.type Character.
-#' Plot system to use.
-#' Current options are \code{\link[qgraph]{qgraph}} and \code{\link{GGally}}.
-#' Defaults to \code{"GGally"}
 #'
 #' @param plot.args List.
 #' A list of additional arguments for the network plot.
@@ -155,11 +190,6 @@
 #' Arguments should be input as a list. Some example arguments 
 #' (see \code{\link[lavaan]{lavOptions} for full details})
 #' 
-#' @param verbose Boolean.
-#' Should network estimation parameters be printed?
-#' Defaults to \code{TRUE}.
-#' Set to \code{FALSE} for no print out
-#' 
 #' @return Returns a list containing:
 #' 
 #' \item{EGA}{Results from \code{\link[EGAnet]{EGA}}}
@@ -183,8 +213,6 @@
 #' 
 #' }
 #' 
-#' 
-#' 
 #' }
 #'
 #' @author  
@@ -199,8 +227,7 @@
 #' # Obtain example data
 #' data <- optimism
 #' 
-#' \dontrun{
-#' # riEGA example
+#' \donttest{# riEGA example
 #' opt.res <- riEGA(data = optimism)
 #' }
 #'
@@ -214,22 +241,29 @@
 #' 
 # Random-Intercept EGA
 # Changed from 'residualEGA.R' on 17.04.2022
-# Updated 07.05.2022
+# Updated 08.08.2022
 riEGA <- function(
-    data, n = NULL, uni.method = c("expand", "LE"),
+    data, n = NULL, uni.method = c("expand", "LE", "louvain"),
     corr = c("cor_auto", "pearson", "spearman"),
     model = c("glasso", "TMFG"), model.args = list(),
     algorithm = c("walktrap", "louvain"), algorithm.args = list(),
-    plot.EGA = TRUE, plot.type = c("GGally", "qgraph"),
+    consensus.iter = 100,
+    consensus.method = c(
+      "highest_modularity",
+      "most_common",
+      "iterative",
+      "lowest_tefi"
+    ),
+    plot.EGA = TRUE,
     plot.args = list(), estimator = c("auto", "WLSMV", "MLR"),
-    lavaan.args = list(), verbose = TRUE
+    lavaan.args = list()
   )
 {
   
-  #### ARGUMENTS HANDLING ####
+  #### ARGUMENTS HANDLING
   
   if(missing(uni.method)){
-    uni.method <- "LE"
+    uni.method <- "louvain"
   }else{uni.method <- match.arg(uni.method)}
   
   if(missing(corr)){
@@ -246,12 +280,9 @@ riEGA <- function(
     algorithm <- tolower(match.arg(algorithm))
   }
   
-  if(missing(plot.type)){
-    plot.type <- "GGally"
-  }else{plot.type <- match.arg(plot.type)}
-  
-  #### ARGUMENTS HANDLING ####
-  
+  if(missing(consensus.method)){
+    consensus.method <- "most_common"
+  }else{consensus.method <- match.arg(consensus.method)}
   
   # Ensure data is a matrix
   data <- as.matrix(data)
@@ -325,7 +356,7 @@ riEGA <- function(
     })
     
     # Check categories
-    if(any(categories < 6)){# Not all continuous
+    if(sum(categories < 6) > 1){# Not all continuous
       lavaan.args$estimator <- "WLSMV"
       lavaan.args$missing <- "pairwise"
       lavaan.args$ordered <- TRUE
@@ -399,21 +430,21 @@ riEGA <- function(
   }
   
   # Set the rest of the arguments
-  ega_defaults$n <- n
-  ega_defaults$uni.method <- uni.method
-  ega_defaults$corr <- corr
-  ega_defaults$model <- model
-  ega_defaults$model.args <- model.args
-  ega_defaults$algorithm <- algorithm
-  ega_defaults$algorithm.args <- algorithm.args
-  ega_defaults$plot.EGA <- plot.EGA
-  ega_defaults$plot.type <- plot.type
-  ega_defaults$plot.args <- plot.args
-  ega_defaults$verbose <- verbose
+  ega_defaults <- list(
+    data = ega_defaults$data,
+    n = n, uni.method = uni.method, corr = corr,
+    model = model, model.args = model.args,
+    algorithm = algorithm, algorithm.args = algorithm.args,
+    consensus.method = consensus.method,
+    consensus.iter = consensus.iter, plot.EGA = plot.EGA,
+    plot.args = plot.args
+  )
   
   # Get EGA
-  ega_result <- do.call(
-    EGA, ega_defaults
+  suppressPackageStartupMessages(
+    ega_result <- do.call(
+      EGA, ega_defaults
+    )
   )
 
   # Return results
@@ -444,6 +475,21 @@ riEGA <- function(
     message(recoding_message)
   
   }
+  
+  # Obtain methods
+  methods <- list()
+  
+  # Lavaan methods
+  methods$estimator <- lavaan.args$estimator
+  methods$corr <- corr
+  methods$model <- model
+  methods$model.args <- model.args
+  methods$algorithm <- algorithm
+  methods$algorithm.args <- algorithm.args
+  methods$uni.method <- uni.method
+  
+  # Add methods to results
+  results$Methods <- methods
   
   # Make class "riEGA"
   class(results) <- "riEGA"

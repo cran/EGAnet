@@ -29,13 +29,6 @@
 #' Defaults to \code{FALSE}.
 #' Set to \code{TRUE} for a positive manifold
 #'
-#' @param plot.NL Boolean.
-#' Should proportional loadings be plotted?
-#' Defaults to \code{FALSE}.
-#' Set to \code{TRUE} for plot with pie charts
-#' visualizing the proportion of loading associated with
-#' each dimension
-#'
 #' @return Returns a list containing:
 #'
 #' \item{unstd}{A matrix of the unstandardized within- and between-community
@@ -46,9 +39,6 @@
 #' 
 #' \item{minLoad}{The minimum loading to appear in summary of network loadings.
 #' Use \code{print()} or \code{summary()} to view}
-#' 
-#' \item{plot}{A \code{\link[qgraph]{qgraph}} plot of the network loadings.
-#' Use \code{plot} to view} 
 #'
 #' @details Simulation studies have demonstrated that a node's strength
 #' centrality is roughly equivalent to factor loadings
@@ -65,14 +55,20 @@
 #' # Load data
 #' wmt <- wmt2[,7:24]
 #'
-#' \dontrun{
-#' # Estimate EGA
-#' ega.wmt <- EGA(wmt)
-#'
-#' }
+#' \donttest{# Estimate EGA
+#' ega.wmt <- EGA(
+#'   data = wmt,
+#'   plot.EGA = FALSE # No plot for CRAN checks
+#' )}
 #'
 #' # Network loadings
 #' net.loads(ega.wmt)
+#' 
+#' \donttest{# Produce Methods section
+#' methods.section(
+#'   ega.wmt,
+#'   stats = "net.loads"
+#' )}
 #'
 #' @references
 #' Christensen, A. P., & Golino, H. (2021).
@@ -92,8 +88,8 @@
 #' @export
 #'
 # Network Loadings
-# Updated 01.02.2022
-net.loads <- function(A, wc, pos.manifold = FALSE, min.load = 0, plot.NL = FALSE)
+# Updated 07.07.2022
+net.loads <- function(A, wc, pos.manifold = FALSE, min.load = 0)
 {
   #------------------------------------------#
   ## DETECT EGA INPUT AND VARIABLE ORDERING ##
@@ -131,8 +127,8 @@ net.loads <- function(A, wc, pos.manifold = FALSE, min.load = 0, plot.NL = FALSE
   }
   
   # Check if there are actual dimensions
-  if(length(wc) == length(unique(wc)))
-  {
+  if(length(wc) == length(unique(wc))){
+    
     # Initialize result list
     res <- list()
     
@@ -141,10 +137,8 @@ net.loads <- function(A, wc, pos.manifold = FALSE, min.load = 0, plot.NL = FALSE
     res$std <- matrix(NA, nrow = ncol(A), ncol = ncol(A))
     
   }else{
-    
-    ###############################
-    #### START DATA MANAGEMENT ####
-    ###############################
+  
+    #### START DATA MANAGEMENT
     
     #----------------------#
     ## REORDER FOR OUTPUT ##
@@ -164,8 +158,8 @@ net.loads <- function(A, wc, pos.manifold = FALSE, min.load = 0, plot.NL = FALSE
     dim.uniq <- na.omit(unique(wc))
     
     # Check for single item dimensions
-    for(i in 1:length(dim.uniq))
-    {
+    for(i in 1:length(dim.uniq)){
+      
       len <- length(wc[which(wc==dim.uniq[i])])
       
       if(len == 1)
@@ -178,17 +172,11 @@ net.loads <- function(A, wc, pos.manifold = FALSE, min.load = 0, plot.NL = FALSE
     # Remove NA attribute
     attr(dims, "na.action") <- NULL
     
-    #############################
-    #### END DATA MANAGEMENT ####
-    #############################
-    
     # Make sure that there are actual dimensions
     if(length(dims) != 1)
     {
-      
-      ################################
-      #### START COMPUTE LOADINGS ####
-      ################################
+
+      #### START COMPUTE LOADINGS
       
       # Compute absolute loadings
       comm.str <- mat.func(A = A, wc = wc, absolute = TRUE, diagonal = 0)
@@ -210,13 +198,7 @@ net.loads <- function(A, wc, pos.manifold = FALSE, min.load = 0, plot.NL = FALSE
       res.rev <- add.signs(comm.str = comm.str, A = A, wc = wc, dims = dims, pos.manifold = pos.manifold)
       comm.str <- res.rev$comm.str
       
-      ##############################
-      #### END COMPUTE LOADINGS ####
-      ##############################
-      
-      #################################
-      #### START OUTPUT MANAGEMENT ####
-      #################################
+      #### START OUTPUT MANAGEMENT
       
       # Initialize result list
       res <- list()
@@ -231,41 +213,6 @@ net.loads <- function(A, wc, pos.manifold = FALSE, min.load = 0, plot.NL = FALSE
       {std <- t(t(unstd) / sqrt(colSums(abs(unstd))))
       }else{std <- t(t(unstd) / sqrt(sum(abs(unstd))))}
       res$std <- as.data.frame(round(descend.ord(std, wc),3))
-      
-      #####################
-      #### PLOT SET UP ####
-      #####################
-      
-      if(plot.NL){
-        
-        #Set to absolute for multidimensional
-        std.res <- as.matrix(abs(res$std))
-        
-        #Standardize
-        std.res <- std.res / rowSums(std.res)
-        
-        #Ensure that pie value is not greater than 1
-        std.res <- std.res - .001
-        std.res <- ifelse(std.res==-.001,0,std.res)
-        
-        # Reorder to match membership
-        std.res <- std.res[,levels(as.factor(wc))]
-        
-        #Split results to list for each node
-        pies <- split(std.res, rep(1:nrow(std.res)))
-        
-        # Plot (or not)
-        nl.plot <- qgraph::qgraph(A, layout = "spring", groups = as.factor(wc),
-                                  label.prop = 1, pie = pies, vTrans = 200,
-                                  negDashed = TRUE, DoNotPlot = ifelse(plot,FALSE,TRUE))
-        
-        # Remove loadings (added as attribute)
-        ## S3Methods summary and print
-        res$MinLoad <- min.load
-        ## S3Methods plot
-        res$plot <- nl.plot
-        
-      }
       
     }else if(all(is.na(wc)))
     {
@@ -314,6 +261,9 @@ net.loads <- function(A, wc, pos.manifold = FALSE, min.load = 0, plot.NL = FALSE
     class(res) <- "NetLoads"
     
   }
+  
+  # Add minimum loading
+  res$minLoad <- min.load
   
   return(res)
 }

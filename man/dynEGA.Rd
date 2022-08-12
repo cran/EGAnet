@@ -15,7 +15,7 @@ dynEGA(
   use.derivatives = 1,
   model = c("glasso", "TMFG"),
   model.args = list(),
-  algorithm = c("walktrap", "louvain"),
+  algorithm = c("walktrap", "leiden", "louvain"),
   algorithm.args = list(),
   corr = c("cor_auto", "pearson", "spearman"),
   ncores,
@@ -90,7 +90,7 @@ A list of additional arguments for \code{\link[EGAnet]{EBICglasso.qgraph}}
 or \code{\link[EGAnet]{TMFG}}}
 
 \item{algorithm}{A string indicating the algorithm to use or a function from \code{\link{igraph}}
-
+Defaults to \code{"walktrap"}.
 Current options are:
 
 \itemize{
@@ -98,8 +98,12 @@ Current options are:
 \item{\strong{\code{walktrap}}}
 {Computes the Walktrap algorithm using \code{\link[igraph]{cluster_walktrap}}}
 
+\item{\strong{\code{leiden}}}
+{Computes the Leiden algorithm using \code{\link[igraph]{cluster_leiden}}.
+Defaults to \code{objective_function = "modularity"}}
+
 \item{\strong{\code{louvain}}}
-{Computes the Walktrap algorithm using \code{\link[igraph]{cluster_louvain}}}
+{Computes the Louvain algorithm using \code{\link[igraph]{cluster_louvain}}}
 
 }}
 
@@ -146,27 +150,38 @@ EGA, dynEGA is a dynamic model that estimates the factor structure by modeling h
 GLLA is a filtering method for estimating derivatives from data that uses time delay embedding and a variant of Savitzky-Golay filtering to accomplish the task.
 }
 \examples{
-\donttest{# Population structure:
-## plot.type = "qqraph" used for CRAN checks
-## plot.type = "GGally" is the default
-dyn.random <- dynEGA(data = sim.dynEGA, n.embed = 5, tau = 1,
-delta = 1, id = 21, group = 22, use.derivatives = 1,
-level = "population", model = "glasso", ncores = 2)
+# Obtain data
+sim.dynEGA <- sim.dynEGA # bypasses CRAN checks
 
-plot(dyn.random, plot.type = "qgraph")
+\donttest{# Population structure
+dyn.random <- dynEGA(
+  data = sim.dynEGA, n.embed = 5, tau = 1,
+  delta = 1, id = 21, group = 22, use.derivatives = 1,
+  level = "population", ncores = 2, corr = "pearson"
+)
 
-# Group structure:
-dyn.group <- dynEGA(data = sim.dynEGA, n.embed = 5, tau = 1,
-delta = 1, id = 21, group = 22, use.derivatives = 1,
-level = "group", model = "glasso", ncores = 2)
+# Plot population structure
+plot(dyn.random)
 
-plot(dyn.group, ncol = 2, nrow = 1, plot.type = "qgraph")
+# Group structure
+dyn.group <- dynEGA(
+  data = sim.dynEGA, n.embed = 5, tau = 1,
+  delta = 1, id = 21, group = 22, use.derivatives = 1,
+  level = "group", ncores = 2, corr = "pearson"
+)
 
-# Intraindividual structure (commented out for CRAN tests):
-# dyn.individual <- dynEGA(data = sim.dynEGA, n.embed = 5, tau = 1,
-# delta = 1, id = 21, group = 22, use.derivatives = 1,
-# level = "individual", model = "glasso", ncores = 2)
-}
+# Plot group structure
+plot(dyn.group, ncol = 2, nrow = 1)
+
+# Intraindividual structure
+dyn.individual <- dynEGA(
+  data = sim.dynEGA, n.embed = 5, tau = 1,
+  delta = 1, id = 21, group = 22, use.derivatives = 1,
+  level = "individual", ncores = 2, corr = "pearson"
+)
+
+# Plot individual structure (participant 1)
+plot(dyn.individual, id = 1)}
 
 }
 \references{

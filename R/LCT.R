@@ -77,7 +77,7 @@
 #' @export
 #'
 # Loadings Comparison Test----
-# Updated 16.06.2021
+# Updated 07.07.2022
 LCT <- function (data, n, iter = 100,
                  dynamic = FALSE,
                  dynamic.args = list(
@@ -90,8 +90,7 @@ LCT <- function (data, n, iter = 100,
   data <- as.matrix(data)
   
   # Number of cases
-  if(nrow(data) == ncol(data))
-  {
+  if(nrow(data) == ncol(data)){
     if(missing(n))
     {stop("Argument 'n' must be supplied for an m x m matrix")}
     
@@ -102,11 +101,20 @@ LCT <- function (data, n, iter = 100,
   nl <- matrix(0, nrow = iter, ncol = 5)
   fl <- nl
   
-  # Initialize count
-  count <- 1
+  # Calculate total computations
+  total_computations <- iter
   
-  # Initialize progress bar
-  pb <- txtProgressBar(max = iter, style = 3)
+  # Count computations
+  count_computations <- 0
+  
+  # Initialize runtime updates
+  runtime_update <- seq(0, total_computations, floor(total_computations / 100))
+  runtime_update <- c(runtime_update, total_computations)
+  
+  # Obtain start time
+  if(count_computations == 0){
+    start_time <- Sys.time()
+  }
   
   repeat{
     
@@ -123,7 +131,7 @@ LCT <- function (data, n, iter = 100,
       # Generate data
       if(nrow(data) != ncol(data)) {
         
-        if(count == 1) {
+        if(count_computations == 1) {
           dat <- data
         } else {
           dat <- MASS_mvrnorm(cases, mu = rep(0, ncol(data)), Sigma = cov(data, use = "pairwise.complete.obs"))
@@ -144,7 +152,9 @@ LCT <- function (data, n, iter = 100,
         }else{
           
           # Compute correlation
-          cor.mat <- qgraph::cor_auto(dat)
+          cor.mat <- suppressMessages(
+            qgraph::cor_auto(dat)
+          )
           
         }
         
@@ -156,13 +166,15 @@ LCT <- function (data, n, iter = 100,
           
         }else{
           
-          if(count == 1) {
+          if(count_computations == 1) {
             cor.mat <- data
           } else {
             
             dat <- MASS_mvrnorm(cases, mu = rep(0, ncol(data)), Sigma = data)
             
-            cor.mat <- qgraph::cor_auto(dat)
+            cor.mat <-  suppressMessages(
+              qgraph::cor_auto(dat)
+            )
           }
           
         }
@@ -184,10 +196,10 @@ LCT <- function (data, n, iter = 100,
                  use.derivatives = dynamic.args$use.derivatives,
                  id = ncol(dat) - 1, group = ncol(dat),
                  model = "glasso", algorithm = "walktrap",
-                 corr = "pearson", ncores = 2)
-        )), silent = TRUE)$dynEGA
+                 corr = "pearson", ncores = 2)$dynEGA
+        )), silent = TRUE)
         
-        cor.mat <- net$cor.data
+        cor.mat <- net$correlation
         
       }else{
         net <- try(suppressWarnings(suppressMessages(EGA(cor.mat, n = cases, plot.EGA = FALSE))), silent = TRUE)
@@ -246,7 +258,7 @@ LCT <- function (data, n, iter = 100,
               n.cross <- NA
             }
             
-            nl[count,] <- c(n.low, n.mod, n.high, n.dom, n.cross)
+            nl[count_computations,] <- c(n.low, n.mod, n.high, n.dom, n.cross)
             
             # Get factor loading proportions
             if(length(rm.NA) != 0){
@@ -286,13 +298,31 @@ LCT <- function (data, n, iter = 100,
               f.cross <- NA
             }
             
-            fl[count,] <- c(f.low, f.mod, f.high, f.dom, f.cross)
+            fl[count_computations,] <- c(f.low, f.mod, f.high, f.dom, f.cross)
             
             # Increase count
-            count <- count + 1
+            count_computations <- count_computations + 1
             
             # Update progress
-            setTxtProgressBar(pb, count)
+            if(count_computations < 5){
+              
+              # Update progress
+              custom_progress(
+                i = count_computations,
+                max = total_computations,
+                start_time = "calculating"
+              )
+              
+            }else if(count_computations %in% runtime_update){
+              
+              # Update progress
+              custom_progress(
+                i = count_computations,
+                max = total_computations,
+                start_time = start_time
+              )
+              
+            }
             
             # Good data!
             good <- TRUE
@@ -304,12 +334,9 @@ LCT <- function (data, n, iter = 100,
     }
     
     # Break out of repeat
-    if(count == (iter+1))
+    if(count_computations == (iter+1))
     {break}
   }
-  
-  # Close progress bar
-  close(pb)
   
   # Convert to data frames
   loads.mat <- as.matrix(cbind(nl, fl))

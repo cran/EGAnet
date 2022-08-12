@@ -7,18 +7,18 @@
 riEGA(
   data,
   n = NULL,
-  uni.method = c("expand", "LE"),
+  uni.method = c("expand", "LE", "louvain"),
   corr = c("cor_auto", "pearson", "spearman"),
   model = c("glasso", "TMFG"),
   model.args = list(),
   algorithm = c("walktrap", "louvain"),
   algorithm.args = list(),
+  consensus.iter = 100,
+  consensus.method = c("highest_modularity", "most_common", "iterative", "lowest_tefi"),
   plot.EGA = TRUE,
-  plot.type = c("GGally", "qgraph"),
   plot.args = list(),
   estimator = c("auto", "WLSMV", "MLR"),
-  lavaan.args = list(),
-  verbose = TRUE
+  lavaan.args = list()
 )
 }
 \arguments{
@@ -34,7 +34,7 @@ Sample size if \code{data} provided is a correlation matrix}
 
 \item{uni.method}{Character.
 What unidimensionality method should be used? 
-Defaults to \code{"LE"}.
+Defaults to \code{"louvain"}.
 Current options are:
 
 \itemize{
@@ -47,11 +47,17 @@ expansion is used. This is the method used in the Golino et al. (2020)
 \emph{Psychological Methods} simulation.}
 
 \item{\strong{\code{LE}}}
-{Applies the leading eigenvalue algorithm (\code{\link[igraph]{cluster_leading_eigen}})
+{Applies the Leading Eigenvalue algorithm (\code{\link[igraph]{cluster_leading_eigen}})
 on the empirical correlation matrix. If the number of dimensions is 1,
-then the leading eigenvalue solution is used; otherwise, regular EGA
+then the Leading Eigenvalue solution is used; otherwise, regular EGA
 is used. This is the final method used in the Christensen, Garrido,
 and Golino (2021) simulation.}
+
+\item{\strong{\code{louvain}}}
+{Applies the Louvain algorithm (\code{\link[igraph]{cluster_louvain}})
+on the empirical correlation matrix using a resolution parameter = 0.95.
+If the number of dimensions is 1, then the Louvain solution is used; otherwise,
+regular EGA is used. This method was validated in the Christensen (2022) simulation.}
 
 }}
 
@@ -91,7 +97,7 @@ extended Bayesian information criterion to select optimal regularization paramet
 
 \item{model.args}{List.
 A list of additional arguments for \code{\link[EGAnet]{EBICglasso.qgraph}}
-or \code{\link[NetworkToolbox]{TMFG}}}
+or \code{TMFG}}
 
 \item{algorithm}{A string indicating the algorithm to use or a function from \code{\link{igraph}}
 Defaults to \code{"walktrap"}.
@@ -111,14 +117,43 @@ Current options are:
 A list of additional arguments for \code{\link[igraph]{cluster_walktrap}}, \code{\link[igraph]{cluster_louvain}},
 or some other community detection algorithm function (see examples)}
 
+\item{consensus.iter}{Numeric.
+Number of iterations to perform in consensus clustering for the Louvain algorithm
+(see Lancichinetti & Fortunato, 2012).
+Defaults to \code{100}}
+
+\item{consensus.method}{Character.
+What consensus clustering method should be used? 
+Defaults to \code{"highest_modularity"}.
+Current options are:
+
+\itemize{
+
+\item{\strong{\code{highest_modularity}}}
+{Uses the community solution that achieves the highest modularity
+across iterations}
+
+\item{\strong{\code{most_common}}}
+{Uses the community solution that is found the most
+across iterations}
+
+\item{\strong{\code{iterative}}}
+{Identifies the most common community solutions across iterations
+and determines how often nodes appear in the same community together.
+A threshold of 0.30 is used to set low proportions to zero.
+This process repeats iteratively until all nodes have a proportion of
+1 in the community solution.
+}
+
+\item{\code{lowest_tefi}}
+{Uses the community solution that achieves the lowest \code{\link[EGAnet]{tefi}}
+across iterations}
+
+}}
+
 \item{plot.EGA}{Boolean.
 If \code{TRUE}, returns a plot of the network and its estimated dimensions.
 Defaults to \code{TRUE}}
-
-\item{plot.type}{Character.
-Plot system to use.
-Current options are \code{\link[qgraph]{qgraph}} and \code{\link{GGally}}.
-Defaults to \code{"GGally"}}
 
 \item{plot.args}{List.
 A list of additional arguments for the network plot.
@@ -171,11 +206,6 @@ If \code{reduce.method = "latent"}, then \code{\link{lavaan}}'s \code{\link[lava
 function will be used to create latent variables to reduce variables.
 Arguments should be input as a list. Some example arguments 
 (see \code{\link[lavaan]{lavOptions} for full details})}
-
-\item{verbose}{Boolean.
-Should network estimation parameters be printed?
-Defaults to \code{TRUE}.
-Set to \code{FALSE} for no print out}
 }
 \value{
 Returns a list containing:
@@ -201,8 +231,6 @@ model (if the model converged):
 
 }
 
-
-
 }
 }
 \description{
@@ -215,8 +243,7 @@ reversed items in the database
 # Obtain example data
 data <- optimism
 
-\dontrun{
-# riEGA example
+\donttest{# riEGA example
 opt.res <- riEGA(data = optimism)
 }
 

@@ -7,16 +7,16 @@
 EGA(
   data,
   n = NULL,
-  uni.method = c("expand", "LE"),
   corr = c("cor_auto", "pearson", "spearman"),
+  uni.method = c("expand", "LE", "louvain"),
   model = c("glasso", "TMFG"),
   model.args = list(),
-  algorithm = c("walktrap", "louvain"),
+  algorithm = c("walktrap", "leiden", "louvain"),
   algorithm.args = list(),
+  consensus.method = c("highest_modularity", "most_common", "iterative", "lowest_tefi"),
+  consensus.iter = 100,
   plot.EGA = TRUE,
-  plot.type = c("GGally", "qgraph"),
   plot.args = list(),
-  verbose = TRUE,
   ...
 )
 }
@@ -28,29 +28,6 @@ then argument \code{n} (number of cases) is \strong{required}}
 
 \item{n}{Integer.
 Sample size if \code{data} provided is a correlation matrix}
-
-\item{uni.method}{Character.
-What unidimensionality method should be used? 
-Defaults to \code{"LE"}.
-Current options are:
-
-\itemize{
-
-\item{\strong{\code{expand}}}
-{Expands the correlation matrix with four variables correlated .50.
-If number of dimension returns 2 or less in check, then the data 
-are unidimensional; otherwise, regular EGA with no matrix
-expansion is used. This is the method used in the Golino et al. (2020)
-\emph{Psychological Methods} simulation.}
-
-\item{\strong{\code{LE}}}
-{Applies the leading eigenvalue algorithm (\code{\link[igraph]{cluster_leading_eigen}})
-on the empirical correlation matrix. If the number of dimensions is 1,
-then the leading eigenvalue solution is used; otherwise, regular EGA
-is used. This is the final method used in the Christensen, Garrido,
-and Golino (2021) simulation.}
-
-}}
 
 \item{corr}{Type of correlation matrix to compute. The default uses \code{\link[qgraph]{cor_auto}}.
 Current options are:
@@ -68,6 +45,35 @@ the \code{\link[stats]{cor}}} function.
 \item{\strong{\code{spearman}}}
 {Computes Spearman's correlation coefficient using the pairwise complete observations via
 the \code{\link[stats]{cor}}} function.
+}}
+
+\item{uni.method}{Character.
+What unidimensionality method should be used? 
+Defaults to \code{"LE"}.
+Current options are:
+
+\itemize{
+
+\item{\strong{\code{expand}}}
+{Expands the correlation matrix with four variables correlated .50.
+If number of dimension returns 2 or less in check, then the data 
+are unidimensional; otherwise, regular EGA with no matrix
+expansion is used. This is the method used in the Golino et al. (2020)
+\emph{Psychological Methods} simulation.}
+
+\item{\strong{\code{LE}}}
+{Applies the Leading Eigenvalue algorithm (\code{\link[igraph]{cluster_leading_eigen}})
+on the empirical correlation matrix. If the number of dimensions is 1,
+then the Leading Eigenvalue solution is used; otherwise, regular EGA
+is used. This is the final method used in the Christensen, Garrido,
+and Golino (2021) simulation.}
+
+\item{\strong{\code{louvain}}}
+{Applies the Louvain algorithm (\code{\link[igraph]{cluster_louvain}})
+on the empirical correlation matrix using a resolution parameter = 0.95.
+If the number of dimensions is 1, then the Louvain solution is used; otherwise,
+regular EGA is used. This method was validated in the Christensen (2022) simulation.}
+
 }}
 
 \item{model}{Character.
@@ -99,6 +105,10 @@ Current options are:
 \item{\strong{\code{walktrap}}}
 {Computes the Walktrap algorithm using \code{\link[igraph]{cluster_walktrap}}}
 
+\item{\strong{\code{leiden}}}
+{Computes the Leiden algorithm using \code{\link[igraph]{cluster_leiden}}.
+Defaults to \code{objective_function = "modularity"}}
+
 \item{\strong{\code{louvain}}}
 {Computes the Louvain algorithm using \code{\link[igraph]{cluster_louvain}}}
 
@@ -108,14 +118,43 @@ Current options are:
 A list of additional arguments for \code{\link[igraph]{cluster_walktrap}}, \code{\link[igraph]{cluster_louvain}},
 or some other community detection algorithm function (see examples)}
 
+\item{consensus.method}{Character.
+What consensus clustering method should be used? 
+Defaults to \code{"highest_modularity"}.
+Current options are:
+
+\itemize{
+
+\item{\strong{\code{highest_modularity}}}
+{Uses the community solution that achieves the highest modularity
+across iterations}
+
+\item{\strong{\code{most_common}}}
+{Uses the community solution that is found the most
+across iterations}
+
+\item{\strong{\code{iterative}}}
+{Identifies the most common community solutions across iterations
+and determines how often nodes appear in the same community together.
+A threshold of 0.30 is used to set low proportions to zero.
+This process repeats iteratively until all nodes have a proportion of
+1 in the community solution.
+}
+
+\item{\code{lowest_tefi}}
+{Uses the community solution that achieves the lowest \code{\link[EGAnet]{tefi}}
+across iterations}
+
+}}
+
+\item{consensus.iter}{Numeric.
+Number of iterations to perform in consensus clustering for the Louvain algorithm
+(see Lancichinetti & Fortunato, 2012).
+Defaults to \code{100}}
+
 \item{plot.EGA}{Boolean.
 If \code{TRUE}, returns a plot of the network and its estimated dimensions.
 Defaults to \code{TRUE}}
-
-\item{plot.type}{Character.
-Plot system to use.
-Current options are \code{\link[qgraph]{qgraph}} and \code{\link{GGally}}.
-Defaults to \code{"GGally"}}
 
 \item{plot.args}{List.
 A list of additional arguments for the network plot.
@@ -155,11 +194,6 @@ more details and examples}
 
 }}
 
-\item{verbose}{Boolean.
-Should network estimation parameters be printed?
-Defaults to \code{TRUE}.
-Set to \code{FALSE} for no print out}
-
 \item{...}{Additional arguments.
 Used for deprecated arguments from previous versions of \code{\link{EGA}}}
 }
@@ -192,39 +226,45 @@ Notably, any community detection algorithm from the \code{\link{igraph}}
 can be used to estimate the number of communities (see examples).
 }
 \examples{
+# Obtain data
+wmt <- wmt2[,7:24]
+
 \donttest{# Estimate EGA
-## plot.type = "qqraph" used for CRAN checks
-## plot.type = "GGally" is the default
-ega.wmt <- EGA(data = wmt2[,7:24], plot.type = "qgraph")
+ega.wmt <- EGA(
+  data = wmt,
+  plot.EGA = FALSE # No plot for CRAN checks
+)
 
 # Summary statistics
 summary(ega.wmt)
 
+# Produce Methods section
+methods.section(ega.wmt)
+
 # Estimate EGAtmfg
-ega.wmt <- EGA(data = wmt2[,7:24], model = "TMFG", plot.type = "qgraph")
+ega.wmt.tmfg <- EGA(
+  data = wmt, model = "TMFG",
+  plot.EGA = FALSE # No plot for CRAN checks
+)
 
 # Estimate EGA with Louvain algorithm
-ega.wmt <- EGA(data = wmt2[,7:24], algorithm = "louvain", plot.type = "qgraph")
+ega.wmt.louvain <- EGA(
+  data = wmt, algorithm = "louvain",
+  plot.EGA = FALSE # No plot for CRAN checks
+)
+
+# Estimate EGA with Leiden algorithm
+ega.wmt.leiden <- EGA(
+  data = wmt, algorithm = "leiden",
+  plot.EGA = FALSE # No plot for CRAN checks
+)
 
 # Estimate EGA with Spinglass algorithm
-ega.wmt <- EGA(data = wmt2[,7:24],
-algorithm = igraph::cluster_spinglass, plot.type = "qgraph")
-
-# Estimate EGA
-ega.intel <- EGA(data = intelligenceBattery[,8:66], model = "glasso", plot.EGA = FALSE)
-
-# Summary statistics
-summary(ega.intel)
-}
-
- \dontshow{# Fast for CRAN checks
-# Pearson's correlation matrix
-wmt <- cor(wmt2[,7:24])
-
-# Estimate EGA
-ega.wmt <- EGA(data = wmt, n = nrow(wmt2), model = "glasso", plot.EGA = FALSE)
-
-}
+ega.wmt.spinglass <- EGA(
+  data = wmt,
+  algorithm = igraph::cluster_spinglass, # any {igraph} algorithm
+  plot.EGA = FALSE # No plot for CRAN checks
+)}
 
 }
 \references{
@@ -232,6 +272,11 @@ ega.wmt <- EGA(data = wmt, n = nrow(wmt2), model = "glasso", plot.EGA = FALSE)
 Blondel, V. D., Guillaume, J.-L., Lambiotte, R., & Lefebvre, E. (2008).
 Fast unfolding of communities in large networks.
 \emph{Journal of Statistical Mechanics: Theory and Experiment}, \emph{2008}, P10008.
+
+# Comprehensive unidimensionality simulation \cr
+Christensen, A. P. (2022).
+Unidimensional community detection: A Monte Carlo simulation, grid search, and comparison.
+\emph{PsyArXiv}.
 
 # Compared all \emph{igraph} community detections algorithms, introduced Louvain algorithm, simulation with continuous and polytomous data \cr
 # Also implements the Leading Eigenvalue unidimensional method \cr
