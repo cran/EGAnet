@@ -4,7 +4,7 @@
 \alias{boot.ergoInfo}
 \title{Bootstrap Test for the Ergodicity Information Index}
 \usage{
-boot.ergoInfo(dynEGA.object, EII, iter = 100, ncores)
+boot.ergoInfo(dynEGA.object, EII, iter = 100, ncores, progress = TRUE)
 }
 \arguments{
 \item{dynEGA.object}{A \code{\link[EGAnet]{dynEGA}} or a
@@ -26,6 +26,11 @@ Recommended to use maximum number of cores minus one
 
 If you're unsure how many cores your computer has,
 then use the following code: \code{parallel::detectCores()}}
+
+\item{progress}{Boolean.
+Should progress be displayed?
+Defaults to \code{TRUE}.
+For Windows, \code{FALSE} is about 2x faster}
 }
 \value{
 Returns a list containing:
@@ -55,7 +60,7 @@ all participants in the data have the population network structure. Sampling is 
 random noise is added to the edges of the population structure to simulate sampling variability. This noise
 follows a random uniform distribution ranging from -0.10 to 0.10. In addition, a proportion of edges are
 rewired to allow for slight variations on the population structure. The proportion of nodes that are rewired
-is sampled from a random uniform distribution between 0.10 to 0.40. This process is carried out for each
+is sampled from a random uniform distribution between 0.20 to 0.40. This process is carried out for each
 participant resulting in \emph{n} variations of the population structure. Afterward, EII is computed. This
 process is carried out for \emph{i} iterations (e.g., 100).
 
@@ -67,10 +72,14 @@ then the empirical data cannot be described by the population structure -- signi
 collapsing across to the population structure.
 }
 \examples{
-\donttest{# Dynamic EGA individual and population structures
+# Obtain simulated data
+sim.data <- sim.dynEGA
+
+\dontrun{
+# Dynamic EGA individual and population structures
 dyn1 <- dynEGA.ind.pop(
-  data = sim.dynEGA[,-c(22)], n.embed = 5, tau = 1,
-  delta = 1, id = 21, use.derivatives = 1,
+  data = sim.dynEGA[,-26], n.embed = 5, tau = 1,
+  delta = 1, id = 25, use.derivatives = 1,
   model = "glasso", ncores = 2, corr = "pearson"
 )
 

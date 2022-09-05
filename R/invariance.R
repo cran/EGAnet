@@ -7,6 +7,10 @@
 #' 
 #' @param groups Vector.
 #' Group membership corresponding to each case in data
+#' 
+#' @param iter Numeric. 
+#' Number of iterations to perform for the permutation.
+#' Defaults to \code{500}
 #'
 #' @param memberships Vector. 
 #' Node membership for each community or factor. 
@@ -17,9 +21,128 @@
 #' Type of measurement invariance to estimate.
 #' Only includes \code{"loadings"} at the moment
 #' 
-#' @param iter Numeric. 
-#' Number of iterations to perform for the permutation.
-#' Defaults to \code{500}
+#' @param model Character.
+#' A string indicating the method to use.
+#'
+#' Current options are:
+#'
+#' \itemize{
+#'
+#' \item{\strong{\code{glasso}}}
+#' {Estimates the Gaussian graphical model using graphical LASSO with
+#' extended Bayesian information criterion to select optimal regularization parameter.
+#' This is the default method}
+#'
+#' \item{\strong{\code{TMFG}}}
+#' {Estimates a Triangulated Maximally Filtered Graph}
+#'
+#' }
+#'
+#' @param model.args List.
+#' A list of additional arguments for \code{\link[EGAnet]{EBICglasso.qgraph}}
+#' or \code{\link[EGAnet]{TMFG}}. By default, \code{gamma} is set to 0 in 
+#' \code{\link[EGAnet]{EBICglasso.qgraph}}
+#'
+#' @param algorithm A string indicating the algorithm to use or a function from \code{\link{igraph}}
+#' Current options are:
+#'
+#' \itemize{
+#'
+#' \item{\strong{\code{walktrap}}}
+#' {Computes the Walktrap algorithm using \code{\link[igraph]{cluster_walktrap}}}
+#' 
+#' \item{\strong{\code{leiden}}}
+#' {Computes the Leiden algorithm using \code{\link[igraph]{cluster_leiden}}}
+#'
+#' \item{\strong{\code{louvain}}}
+#' {Computes the Louvain algorithm using \code{\link[igraph]{cluster_louvain}}}
+#'
+#' }
+#'
+#' @param algorithm.args List.
+#' A list of additional arguments for \code{\link[igraph]{cluster_walktrap}}, \code{\link[igraph]{cluster_louvain}},
+#' or some other community detection algorithm function (see examples)
+#'
+#' @param corr Type of correlation matrix to compute. The default uses \code{\link[qgraph]{cor_auto}}.
+#' Current options are:
+#'
+#' \itemize{
+#'
+#' \item{\strong{\code{cor_auto}}}
+#' {Computes the correlation matrix using the \code{\link[qgraph]{cor_auto}} function from
+#' \code{\link[qgraph]{qgraph}}}.
+#'
+#' \item{\strong{\code{pearson}}}
+#' {Computes Pearson's correlation coefficient using the pairwise complete observations via
+#' the \code{\link[stats]{cor}}} function.
+#'
+#' \item{\strong{\code{spearman}}}
+#' {Computes Spearman's correlation coefficient using the pairwise complete observations via
+#' the \code{\link[stats]{cor}}} function.
+#' }
+#' 
+#' @param uni.method Character.
+#' What unidimensionality method should be used? 
+#' Defaults to \code{"louvain"}.
+#' Current options are:
+#' 
+#' \itemize{
+#'
+#' \item{\strong{\code{expand}}}
+#' {Expands the correlation matrix with four variables correlated .50.
+#' If number of dimension returns 2 or less in check, then the data 
+#' are unidimensional; otherwise, regular EGA with no matrix
+#' expansion is used. This is the method used in the Golino et al. (2020)
+#' \emph{Psychological Methods} simulation.}
+#'
+#' \item{\strong{\code{LE}}}
+#' {Applies the Leading Eigenvalue algorithm (\code{\link[igraph]{cluster_leading_eigen}})
+#' on the empirical correlation matrix. If the number of dimensions is 1,
+#' then the Leading Eigenvalue solution is used; otherwise, regular EGA
+#' is used. This is the final method used in the Christensen, Garrido,
+#' and Golino (2021) simulation.}
+#' 
+#' \item{\strong{\code{louvain}}}
+#' {Applies the Louvain algorithm (\code{\link[igraph]{cluster_louvain}})
+#' on the empirical correlation matrix using a resolution parameter = 0.95.
+#' If the number of dimensions is 1, then the Louvain solution is used; otherwise,
+#' regular EGA is used. This method was validated in the Christensen (2022) simulation.}
+#' 
+#' }
+#' 
+#' @param consensus.iter Numeric.
+#' Number of iterations to perform in consensus clustering for the Louvain algorithm
+#' (see Lancichinetti & Fortunato, 2012).
+#' Defaults to \code{100}
+#' 
+#' @param consensus.method Character.
+#' What consensus clustering method should be used? 
+#' Defaults to \code{"highest_modularity"}.
+#' Current options are:
+#' 
+#' \itemize{
+#' 
+#' \item{\strong{\code{highest_modularity}}}
+#' {Uses the community solution that achieves the highest modularity
+#' across iterations}
+#' 
+#' \item{\strong{\code{most_common}}}
+#' {Uses the community solution that is found the most
+#' across iterations}
+#' 
+#' \item{\strong{\code{iterative}}}
+#' {Identifies the most common community solutions across iterations
+#' and determines how often nodes appear in the same community together.
+#' A threshold of 0.30 is used to set low proportions to zero.
+#' This process repeats iteratively until all nodes have a proportion of
+#' 1 in the community solution.
+#' }
+#' 
+#' \item{\code{lowest_tefi}}
+#' {Uses the community solution that achieves the lowest \code{\link[EGAnet]{tefi}}
+#' across iterations}
+#' 
+#' }
 #' 
 #' @param ncores Numeric.
 #' Number of cores to use in computing results.
@@ -29,8 +152,11 @@
 #'
 #' If you're unsure how many cores your computer has,
 #' then use the following code: \code{parallel::detectCores()}
-#'
-#' @param ... Arguments passed to \code{\link[EGAnet]{EGA}}
+#' 
+#' @param progress Boolean.
+#' Should progress be displayed?
+#' Defaults to \code{TRUE}.
+#' For Windows, \code{FALSE} is about 2x faster
 #'
 #' @return Returns a list containing:
 #' 
@@ -86,19 +212,29 @@
 #' # Groups
 #' groups <- rep(1:2, each = nrow(wmt) / 2)
 #' 
-#' \donttest{
+#' \dontrun{
 #' # Measurement invariance
 #' results <- invariance(wmt, groups, ncores = 2)}
 #' 
 #' @export
 #'
 # Measurement Invariance
-# Updated 18.07.2022
+# Updated 02.09.2022
 invariance <- function(
-  data, groups, 
+  data, groups, iter = 500, 
   memberships = NULL,
   type = c("loadings"),
-  iter = 500, ncores, ...
+  corr = c("cor_auto", "pearson", "spearman"),
+  uni.method = c("expand", "LE", "louvain"),
+  model = c("glasso", "TMFG"), model.args = list(gamma = 0),
+  algorithm = c("walktrap", "leiden", "louvain"), algorithm.args = list(),
+  consensus.method = c(
+    "highest_modularity",
+    "most_common",
+    "iterative",
+    "lowest_tefi"
+  ), consensus.iter = 100, 
+  ncores, progress = TRUE
 )
 {
   # Number of processing cores
@@ -106,29 +242,66 @@ invariance <- function(
     ncores <- round(parallel::detectCores() / 2, 0)
   }
   
-  # Obtain additional arguments
-  add_args <- list(...)
+  # Missing arguments
   
-  # Obtain default EGA arguments
-  ega_args <- formals(EGA.estimate)
+  if(missing(model)){
+    model <- "glasso"
+  }else{model <- tolower(match.arg(model))}
   
-  # Set defaults for EGA
-  ega_args$model <- "glasso" # network estimation
-  ega_args$algorithm <- "walktrap" # community detection
-  ega_args$corr <- "cor_auto" # correlation estimation
-  ega_args$verbose <- FALSE # leave out verbose
-  ega_args$model.args <- list(gamma = 0) # Set gamma to zero to maximize similarities
-  ega_args$... <- NULL
+  if(missing(algorithm)){
+    algorithm <- "walktrap"
+  }else if(!is.function(algorithm)){
+    algorithm <- tolower(match.arg(algorithm))
+  }
   
-  # Check for additional arguments for EGA
-  if(length(add_args) != 0){
-    
-    # Match arguments
-    arg_names <- names(ega_args)[na.omit(match(names(add_args), names(ega_args)))]
-    
-    # Input arguments
-    ega_args[arg_names] <- add_args[arg_names]
-    
+  if(missing(uni.method)){
+    uni.method <- "louvain"
+  }else if(!is.function(uni.method)){
+    uni.method <- match.arg(uni.method)
+  }
+  
+  if(missing(consensus.method)){
+    consensus.method <- "most_common"
+  }else{consensus.method <- tolower(match.arg(consensus.method))}
+  
+  if(missing(corr)){
+    corr <- "cor_auto"
+  }else{corr <- tolower(match.arg(corr))}
+  
+  # Model function
+  model.FUN <- switch(
+    model,
+    "glasso" = EBICglasso.qgraph,
+    "tmfg" = TMFG
+  )
+  
+  # Model arguments
+  model.ARGS <- obtain.arguments(
+    FUN = model.FUN,
+    FUN.args = model.args
+  )
+  
+  # Algorithm function
+  if(!is.function(algorithm)){
+    algorithm.FUN <- switch(
+      algorithm,
+      "walktrap" = igraph::cluster_walktrap,
+      "leiden" = igraph::cluster_leiden,
+      "louvain" = igraph::cluster_louvain
+    )
+  }else{
+    algorithm.FUN <- algorithm
+  }
+  
+  # Algorithm arguments
+  algorithm.ARGS <- obtain.arguments(
+    FUN = algorithm.FUN,
+    FUN.args = algorithm.args
+  )
+  
+  ## Remove weights from igraph functions' arguments
+  if("weights" %in% names(algorithm.ARGS)){
+    algorithm.ARGS[which(names(algorithm.ARGS) == "weights")] <- NULL
   }
   
   # Make sure data and groups match
@@ -136,17 +309,31 @@ invariance <- function(
     stop("Number of cases in 'data' do not match the length of 'groups'. Please check that these numbers match: `nrow(data) == length(groups)`")
   }
   
+  # Obtain EGA arguments
+  ega_args <- obtain.arguments(
+    FUN = EGA,
+    FUN.args = list()
+  )
+  
   # Add data to EGA arguments
   ega_args$data <- data
   
-  # Ensure class is list!
-  class(ega_args) <- "list"
+  # Set EGA arguments
+  ega_args$n <- nrow(data)
+  ega_args$corr <- corr
+  ega_args$model <- model
+  ega_args$model.args <- model.ARGS
+  ega_args$algorithm <- algorithm
+  ega_args$algorithm.args <- algorithm.ARGS
+  ega_args$uni.method <- uni.method
+  ega_args$consensus.method <- consensus.method
+  ega_args$plot.EGA <- FALSE
   
   # Estimate original EGA
   original_EGA <- suppressWarnings(
     suppressMessages(
       do.call(
-        what = EGA.estimate,
+        what = EGA,
         args = ega_args
       )
     )
@@ -170,7 +357,7 @@ invariance <- function(
     suppressWarnings(
       suppressMessages(
         do.call(
-          what = EGA.estimate,
+          what = EGA,
           args = ega_args
         )
       )
@@ -185,12 +372,19 @@ invariance <- function(
   group_loadings <- lapply(group_ega, function(x){
     
     # Obtain loadings
-    loadings <- net.loads(
+    loadings <- as.matrix(net.loads(
       A = x$network, wc = memberships
-    )$std
+    )$std)
     
     # Reorder loadings
     loadings <- loadings[colnames(data),]
+    
+    # Check for vector
+    if(is.vector(loadings)){
+      loadings <- matrix(loadings, ncol = 1)
+      colnames(loadings) <- 1
+      row.names(loadings) <- colnames(data)
+    }
     
     # Return loadings
     return(loadings)
@@ -198,9 +392,11 @@ invariance <- function(
   })
   
   ## Reorder order loadings to match group 1
-  group_loadings <- lapply(group_loadings, function(x){
-    x[,colnames(group_loadings[[1]])]
-  })
+  if(ncol(group_loadings[[1]]) != 1){
+    group_loadings <- lapply(group_loadings, function(x){
+      x[,colnames(group_loadings[[1]])]
+    })
+  }
   
   # Original difference
   original_difference <- group_loadings[[1]] - group_loadings[[2]]
@@ -221,61 +417,126 @@ invariance <- function(
   # Message for estimating permutated loadings
   message("Performing permutations...")
   
-  # Set up parallelization
-  cl <- parallel::makeCluster(ncores)
+  # Obtain operating system
+  os <- system.check()$OS
   
-  # # Export variables (only necessary for testing)
-  # # Comment out for package
-  # parallel::clusterExport(
-  #   cl = cl,
-  #   varlist = c(
-  #     "EGA.estimate",
-  #     "net.loads",
-  #     "unique_groups",
-  #     "perm_groups"
-  #   )
-  # )
-  
-  # Obtain permutated loadings
-  loadings_list <- pbapply::pblapply(
-    X = seq_along(perm_groups),
-    FUN = function(i){
-      
-      # Estimate loadings
-      loadings_groups <- lapply(seq_along(unique_groups), function(j){
+  # Parallelization
+  if(os == "windows"){
+    
+    # Set up parallelization
+    cl <- parallel::makeCluster(ncores)
+    
+    # Export variables (only necessary for testing)
+    # Comment out for package
+    parallel::clusterExport(
+      cl = cl,
+      varlist = c(
+        "EGA", "ega_args",
+        "memberships",
+        "net.loads",
+        "unique_groups",
+        "perm_groups",
+        "data"
+      ),
+      envir = environment()
+    )
+    
+    # Obtain permutated loadings
+    loadings_list <- pbapply::pblapply(
+      X = seq_along(perm_groups),
+      FUN = function(i){
         
-        # Insert permutated data
-        ega_args$data <- data[which(perm_groups[[i]] == unique_groups[j]),]
+        # Estimate loadings
+        loadings_groups <- lapply(seq_along(unique_groups), function(j){
+          
+          # Insert permutated data
+          ega_args$data <- data[which(perm_groups[[i]] == unique_groups[j]),]
+          
+          # Obtain network
+          network <- do.call(
+            what = EGA,
+            args = ega_args
+          )$network
+          
+          # Obtain loadings
+          loadings <- net.loads(A = network, wc = memberships)$std
+          
+          # Reorder loadings
+          loadings <- loadings[colnames(data),]
+          
+          # Check for vector
+          if(is.vector(loadings)){
+            loadings <- matrix(loadings, ncol = 1)
+            colnames(loadings) <- 1
+            row.names(loadings) <- colnames(data)
+          }
+          
+          # Return loadings
+          return(loadings)
+          
+        })
         
-        # Obtain network
-        network <- do.call(
-          what = EGA.estimate,
-          args = ega_args
-        )$network
+        # Name groups
+        names(loadings_groups) <- unique_groups
         
-        # Obtain loadings
-        loadings <- net.loads(A = network, wc = memberships)$std
+        # Return EGA groups
+        return(loadings_groups)
         
-        # Reorder
-        loadings <- loadings[colnames(data),]
+      },
+      cl = cl
+    )
+    
+    # Stop cluster
+    parallel::stopCluster(cl)
+    
+  }else{ # Mac and Linux
+    
+    loadings_list <- parallel_process(
+      datalist = seq_along(perm_groups),
+      progress = progress,
+      FUN = function(i){
         
-        # Return loadings
-        return(loadings)
+        # Estimate loadings
+        loadings_groups <- lapply(seq_along(unique_groups), function(j){
+          
+          # Insert permutated data
+          ega_args$data <- data[which(perm_groups[[i]] == unique_groups[j]),]
+          
+          # Obtain network
+          network <- do.call(
+            what = EGA,
+            args = ega_args
+          )$network
+          
+          # Obtain loadings
+          loadings <- net.loads(A = network, wc = memberships)$std
+          
+          # Reorder loadings
+          loadings <- loadings[colnames(data),]
+          
+          # Check for vector
+          if(is.vector(loadings)){
+            loadings <- matrix(loadings, ncol = 1)
+            colnames(loadings) <- 1
+            row.names(loadings) <- colnames(data)
+          }
+          
+          # Return loadings
+          return(loadings)
+          
+        })
         
-      })
-      
-      # Name groups
-      names(loadings_groups) <- unique_groups
-      
-      # Return EGA groups
-      return(loadings_groups)
-      
-    },
-    cl = cl
-  )
-  
-  # Stop cluster
-  parallel::stopCluster(cl)
+        # Name groups
+        names(loadings_groups) <- unique_groups
+        
+        # Return EGA groups
+        return(loadings_groups)
+        
+      },
+      ncores = ncores
+    )
+    
+  }
   
   # Compute differences
   difference_list <- lapply(loadings_list, function(x){

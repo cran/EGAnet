@@ -110,6 +110,35 @@
 #' @param algorithm.args List.
 #' A list of additional arguments for \code{\link[igraph]{cluster_walktrap}}, \code{\link[igraph]{cluster_louvain}},
 #' or some other community detection algorithm function (see examples)
+#' 
+#' @param uni.method Character.
+#' What unidimensionality method should be used? 
+#' Defaults to \code{"LE"}.
+#' Current options are:
+#' 
+#' \itemize{
+#'
+#' \item{\strong{\code{expand}}}
+#' {Expands the correlation matrix with four variables correlated .50.
+#' If number of dimension returns 2 or less in check, then the data 
+#' are unidimensional; otherwise, regular EGA with no matrix
+#' expansion is used. This is the method used in the Golino et al. (2020)
+#' \emph{Psychological Methods} simulation.}
+#'
+#' \item{\strong{\code{LE}}}
+#' {Applies the Leading Eigenvalue algorithm (\code{\link[igraph]{cluster_leading_eigen}})
+#' on the empirical correlation matrix. If the number of dimensions is 1,
+#' then the Leading Eigenvalue solution is used; otherwise, regular EGA
+#' is used. This is the final method used in the Christensen, Garrido,
+#' and Golino (2021) simulation.}
+#' 
+#' \item{\strong{\code{louvain}}}
+#' {Applies the Louvain algorithm (\code{\link[igraph]{cluster_louvain}})
+#' on the empirical correlation matrix using a resolution parameter = 0.95.
+#' If the number of dimensions is 1, then the Louvain solution is used; otherwise,
+#' regular EGA is used. This method was validated in the Christensen (2022) simulation.}
+#' 
+#' }
 #'
 #' @param ncores Numeric.
 #' Number of cores to use in computing results.
@@ -120,6 +149,11 @@
 #'
 #' If you're unsure how many cores your computer has,
 #' then use the following code: \code{parallel::detectCores()}
+#' 
+#' @param progress Boolean.
+#' Should progress be displayed?
+#' Defaults to \code{TRUE}.
+#' For Windows, \code{FALSE} is about 2x faster
 #'
 #' @param ... Additional arguments.
 #' Used for deprecated arguments from previous versions of \code{\link{EGA}}
@@ -130,10 +164,11 @@
 #' # Obtain data
 #' sim.dynEGA <- sim.dynEGA # bypasses CRAN checks
 #'
-#' \donttest{# Population structure
+#' \dontrun{
+#' # Population structure
 #' dyn.random <- dynEGA(
 #'   data = sim.dynEGA, n.embed = 5, tau = 1,
-#'   delta = 1, id = 21, group = 22, use.derivatives = 1,
+#'   delta = 1, id = 25, group = 26, use.derivatives = 1,
 #'   level = "population", ncores = 2, corr = "pearson"
 #' )
 #'
@@ -143,17 +178,17 @@
 #' # Group structure
 #' dyn.group <- dynEGA(
 #'   data = sim.dynEGA, n.embed = 5, tau = 1,
-#'   delta = 1, id = 21, group = 22, use.derivatives = 1,
+#'   delta = 1, id = 25, group = 26, use.derivatives = 1,
 #'   level = "group", ncores = 2, corr = "pearson"
 #' )
 #'
 #' # Plot group structure
 #' plot(dyn.group, ncol = 2, nrow = 1)
-#'
+#' 
 #' # Intraindividual structure
 #' dyn.individual <- dynEGA(
 #'   data = sim.dynEGA, n.embed = 5, tau = 1,
-#'   delta = 1, id = 21, group = 22, use.derivatives = 1,
+#'   delta = 1, id = 25, group = 26, use.derivatives = 1,
 #'   level = "individual", ncores = 2, corr = "pearson"
 #' )
 #'
@@ -182,7 +217,7 @@
 #'
 #' @export
 # dynEGA
-# Updated 18.07.2022
+# Updated 28.08.2022
 dynEGA <- function(data, n.embed, tau = 1, delta = 1,
                    level = c("individual", "group", "population"),
                    id = NULL, group = NULL,
@@ -190,7 +225,8 @@ dynEGA <- function(data, n.embed, tau = 1, delta = 1,
                    model = c("glasso", "TMFG"), model.args = list(),
                    algorithm = c("walktrap", "leiden", "louvain"), algorithm.args = list(),
                    corr = c("cor_auto", "pearson", "spearman"),
-                   ncores, ...){
+                   uni.method = c("expand", "LE", "louvain"),
+                   ncores, progress = TRUE, ...){
 
   # Get additional arguments
   add.args <- list(...)
@@ -238,28 +274,28 @@ dynEGA <- function(data, n.embed, tau = 1, delta = 1,
     }else{group <- group}
   }else{level <- match.arg(level)}
 
-  if(missing(group))
-  {group <- ncol(data)+1
+  if(missing(group)){
+    group <- ncol(data)+1
   }else{group <- group}
 
   if(missing(model)){
     model <- "glasso"
-  }else{
-    model <- match.arg(model)
-  }
+  }else{model <- match.arg(model)}
 
   if(missing(algorithm)){
     algorithm <- "walktrap"
-  }else{
-    algorithm <- match.arg(algorithm)
-  }
+  }else{algorithm <- match.arg(algorithm)}
 
-  if(missing(corr))
-  {corr <- "pearson"
+  if(missing(corr)){
+    corr <- "pearson"
   }else{corr <- match.arg(corr)}
+  
+  if(missing(uni.method)){
+    uni.method <- "louvain"
+  }else{uni.method <- match.arg(uni.method)}
 
-  if(missing(ncores))
-  {ncores <- ceiling(parallel::detectCores() / 2)
+  if(missing(ncores)){
+    ncores <- ceiling(parallel::detectCores() / 2)
   }else{ncores}
 
   # Setting the order:
@@ -283,40 +319,58 @@ dynEGA <- function(data, n.embed, tau = 1, delta = 1,
 
   # Let user know derivatives estimation has started
   message("\nComputing derivatives using GLLA...\n", appendLF = FALSE)
-
-  #Parallel processing
-  cl <- parallel::makeCluster(ncores)
-
-  #Export variables
-  # parallel::clusterExport(cl = cl,
-  #                         varlist = c("datalist"),
-  #                         envir=environment())
-
-  # GLLA Estimation:
-  glla.multi <- function(data, n.embed = n.embed, tau = tau, delta = delta, order = order){
-    order.deriv <- paste0("Ord",seq(from = 0, to = order))
-    data.est <- vector("list")
-    for(i in 1:ncol(data)){
-      data.est[[i]] <- as.data.frame(EGAnet::glla(data[,i], n.embed = n.embed, tau = tau, delta = delta, order = order))
-      data.est[[i]] <- as.data.frame(data.est[[i]])
+  
+  # Obtain operating system
+  os <- system.check()$OS
+  
+  # Parallelize
+  if(os == "windows"){
+    
+    # Make clusters
+    cl <- parallel::makeCluster(ncores)
+    
+    # Export `glla.multi`
+    parallel::clusterExport(
+      cl = cl,
+      varlist = c("glla.multi"),
+      envir = environment()
+    )
+    
+    # Compute derivatives per ID
+    if(isTRUE(progress)){
+      derivlist <- pbapply::pblapply(
+        X = datalist, cl = cl,
+        FUN = glla.multi,
+        n.embed = n.embed, tau = tau,
+        delta = delta, order = order
+      )
+    }else{ # No progress bar
+      derivlist <- parallel::parLapply(
+        X = datalist, cl = cl,
+        fun = glla.multi,
+        n.embed = n.embed, tau = tau,
+        delta = delta, order = order
+      )
     }
-    data.est2 <- vector("list")
-    for(i in 0:order+1){
-      data.est2[[i]] <- sapply(data.est, "[[", i)
-    }
-
-    data.estimates <- data.frame(Reduce(cbind, data.est2))
-    colnames(data.estimates) <- paste(colnames(data), rep(order.deriv, each = ncol(data)), sep = ".")
-    return(data.estimates)
+    
+    # Stop cluster
+    parallel::stopCluster(cl)
+    
+  }else{ # Mac and Linux
+    
+    derivlist <- parallel_process(
+      datalist = datalist,
+      progress = progress,
+      FUN = glla.multi,
+      FUN_args = list(
+        n.embed = n.embed, tau = tau,
+        delta = delta, order = order
+      ),
+      ncores = ncores
+      
+    )
+    
   }
-
-  # Compute derivatives per ID
-  derivlist <- pbapply::pblapply(X = datalist, cl = cl,
-                                 FUN = glla.multi,
-                                 n.embed = n.embed, tau = tau, delta = delta, order = order)
-
-  # Stop cluster
-  parallel::stopCluster(cl)
 
   ### Estimating the dimensionality structure using EGA:
 
@@ -350,7 +404,7 @@ dynEGA <- function(data, n.embed, tau = 1, delta = 1,
       EGA(data = data.all[, derivative_index],
           model = model, model.args = model.args,
           algorithm = algorithm, algorithm.args = algorithm.args,
-          corr = corr, plot.EGA = FALSE)
+          corr = corr, uni.method = uni.method, plot.EGA = FALSE)
     )
 
     # Message user that results are done
@@ -387,23 +441,59 @@ dynEGA <- function(data, n.embed, tau = 1, delta = 1,
     data.groups <- split(data.all[,derivative_index], data.all$Group)
     names(data.groups) <- paste0("Group", group.memb)
 
-    # Parallel processing
-    cl <- parallel::makeCluster(ncores)
-
-    # Export variables
-    # parallel::clusterExport(cl = cl,
-    #                         varlist = c("data.groups", "group.memb"),
-    #                         envir=environment())
-
-    # Compute derivatives per Group
-    ega.list.groups <- pbapply::pblapply(X = data.groups, cl = cl,
-                                         FUN = EGA,
-                                         model = model, model.args = model.args,
-                                         algorithm = algorithm, algorithm.args = algorithm.args,
-                                         corr = corr, plot.EGA = FALSE)
-
-    # Stop cluster
-    parallel::stopCluster(cl)
+    
+    # Parallelize
+    if(os == "windows"){
+      
+      # Make clusters
+      cl <- parallel::makeCluster(ncores)
+      
+      # Export variables
+      # parallel::clusterExport(
+      #   cl = cl,
+      #   varlist = c("data.groups", "group.memb"),
+      #   envir = environment()
+      # )
+      
+      # Compute derivatives per ID
+      if(isTRUE(progress)){
+        # Compute derivatives per Group
+        ega.list.groups <- pbapply::pblapply(
+          X = data.groups, cl = cl,
+          FUN = EGA,
+          model = model, model.args = model.args,
+          algorithm = algorithm, algorithm.args = algorithm.args,
+          corr = corr, uni.method = uni.method, plot.EGA = FALSE
+        )
+      }else{ # No progress bar
+        ega.list.groups <- parallel::parLapply(
+          X = data.groups, cl = cl,
+          fun = EGA,
+          model = model, model.args = model.args,
+          algorithm = algorithm, algorithm.args = algorithm.args,
+          corr = corr, uni.method = uni.method, plot.EGA = FALSE
+        )
+      }
+      
+      # Stop cluster
+      parallel::stopCluster(cl)
+      
+    }else{ # Mac and Linux
+      
+      ega.list.groups <- parallel_process(
+        datalist = data.groups,
+        progress = progress,
+        FUN = EGA,
+        FUN_args = list(
+          model = model, model.args = model.args,
+          algorithm = algorithm, algorithm.args = algorithm.args,
+          corr = corr, uni.method = uni.method, plot.EGA = FALSE
+        ),
+        ncores = ncores
+        
+      )
+      
+    }
 
   }
 
@@ -460,28 +550,59 @@ dynEGA <- function(data, n.embed, tau = 1, delta = 1,
       }
 
     }
-
-    #Parallel processing
-    cl <- parallel::makeCluster(ncores)
-
-    #Export variables
-    # parallel::clusterExport(cl = cl,
-    #                         varlist = c("data.individuals_var"),
-    #                         envir=environment())
-
-    # EGA estimates per individual:
-    # op <- pbapply::pboptions(type = "none")
-    ega.list.individuals <- pbapply::pblapply(
-      X = data.individuals_var, cl = cl,
-      FUN = EGA,
-      model = model, model.args = model.args,
-      algorithm = algorithm, algorithm.args = algorithm.args,
-      corr = corr, plot.EGA = FALSE
-    )
-    # pbapply::pboptions(op)
-
-    # Stop cluster
-    parallel::stopCluster(cl)
+    
+    # Parallelize
+    if(os == "windows"){
+      
+      # Make clusters
+      cl <- parallel::makeCluster(ncores)
+      
+      # Export variables
+      # parallel::clusterExport(
+      #   cl = cl,
+      #   varlist = c("data.individuals_var"),
+      #   envir=environment()
+      # )
+      
+      # Compute derivatives per ID
+      if(isTRUE(progress)){
+        # EGA estimates per individual
+        ega.list.individuals <- pbapply::pblapply(
+          X = data.individuals_var, cl = cl,
+          FUN = EGA,
+          model = model, model.args = model.args,
+          algorithm = algorithm, algorithm.args = algorithm.args,
+          corr = corr, uni.method = uni.method, plot.EGA = FALSE
+        )
+      }else{ # No progress bar
+        ega.list.individuals <- parallel::parLapply(
+          X = data.individuals_var, cl = cl,
+          fun = EGA,
+          model = model, model.args = model.args,
+          algorithm = algorithm, algorithm.args = algorithm.args,
+          corr = corr, uni.method = uni.method, plot.EGA = FALSE
+        )
+      }
+      
+      # Stop cluster
+      parallel::stopCluster(cl)
+      
+    }else{ # Mac and Linux
+      
+      ega.list.individuals <- parallel_process(
+        datalist = data.individuals_var,
+        progress = progress,
+        FUN = EGA,
+        FUN_args = list(
+          model = model, model.args = model.args,
+          algorithm = algorithm, algorithm.args = algorithm.args,
+          corr = corr, uni.method = uni.method, plot.EGA = FALSE
+        ),
+        ncores = ncores
+        
+      )
+      
+    }
 
     # Add back disconnected variables
     if(length(warning.idx) != 0){

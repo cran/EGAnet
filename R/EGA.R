@@ -40,7 +40,7 @@
 #' 
 #' @param uni.method Character.
 #' What unidimensionality method should be used? 
-#' Defaults to \code{"LE"}.
+#' Defaults to \code{"louvain"}.
 #' Current options are:
 #' 
 #' \itemize{
@@ -207,7 +207,8 @@
 #' # Obtain data
 #' wmt <- wmt2[,7:24]
 #' 
-#' \donttest{# Estimate EGA
+#' \dontrun{
+#' # Estimate EGA
 #' ega.wmt <- EGA(
 #'   data = wmt,
 #'   plot.EGA = FALSE # No plot for CRAN checks
@@ -218,30 +219,26 @@
 #' 
 #' # Produce Methods section
 #' methods.section(ega.wmt)
-#'
+#' 
 #' # Estimate EGAtmfg
 #' ega.wmt.tmfg <- EGA(
-#'   data = wmt, model = "TMFG",
-#'   plot.EGA = FALSE # No plot for CRAN checks
+#'   data = wmt, model = "TMFG"
 #' )
 #'
 #' # Estimate EGA with Louvain algorithm
 #' ega.wmt.louvain <- EGA(
-#'   data = wmt, algorithm = "louvain",
-#'   plot.EGA = FALSE # No plot for CRAN checks
+#'   data = wmt, algorithm = "louvain"
 #' )
 #' 
 #' # Estimate EGA with Leiden algorithm
 #' ega.wmt.leiden <- EGA(
-#'   data = wmt, algorithm = "leiden",
-#'   plot.EGA = FALSE # No plot for CRAN checks
+#'   data = wmt, algorithm = "leiden"
 #' )
 #'
 #' # Estimate EGA with Spinglass algorithm
 #' ega.wmt.spinglass <- EGA(
 #'   data = wmt,
-#'   algorithm = igraph::cluster_spinglass, # any {igraph} algorithm
-#'   plot.EGA = FALSE # No plot for CRAN checks
+#'   algorithm = igraph::cluster_spinglass
 #' )}
 #'
 #' @seealso \code{\link{bootEGA}} to investigate the stability of EGA's estimation via bootstrap
@@ -287,7 +284,7 @@
 #'
 #' @export
 #'
-# Updated 27.07.2022
+# Updated 20.08.2022
 # Louvain unidimensionality 27.07.2022
 # Consensus clustering 13.05.2022
 # LE adjustment 08.03.2021
@@ -474,16 +471,35 @@ EGA <- function (
   }
   
   # Set up results
-  if(uni.res$n.dim == 1){ # Unidimensional 
+  if(uni.method == "expand"){
     
-    # Set results
-    multi.res$wc <- uni.res$wc
-    multi.res$n.dim <- uni.res$n.dim
+    if(uni.res$n.dim <= 2){ # Unidimensional 
+      
+      # Set results
+      multi.res$wc <- uni.res$wc[!grepl("SIM", names(uni.res$wc))]
+      multi.res$n.dim <- uni.res$n.dim
+      
+    }else if(multi.res$n.dim == 0){ # No dimensions
+      
+      # Set results
+      multi.res$n.dim <- NA
+      
+    }
     
-  }else if(multi.res$n.dim == 0){ # No dimensions
+  }else{
     
-    # Set results
-    multi.res$n.dim <- NA
+    if(uni.res$n.dim == 1){ # Unidimensional 
+      
+      # Set results
+      multi.res$wc <- uni.res$wc[!grepl("SIM", names(uni.res$wc))]
+      multi.res$n.dim <- uni.res$n.dim
+      
+    }else if(multi.res$n.dim == 0){ # No dimensions
+      
+      # Set results
+      multi.res$n.dim <- NA
+      
+    }
     
   }
 

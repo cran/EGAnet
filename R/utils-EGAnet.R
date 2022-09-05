@@ -3265,252 +3265,6 @@ custom_progress <- function (
   
 }
 
-#' \code{\link[qgraph]{EBICglasso}} from \code{\link{qgraph}} 1.4.4
-#'
-#' This function uses the \code{\link[glasso]{glasso}} package
-#' (Friedman, Hastie and Tibshirani, 2011) to compute a
-#' sparse gaussian graphical model with the graphical lasso
-#' (Friedman, Hastie & Tibshirani, 2008).
-#' The tuning parameter is chosen using the Extended Bayesian Information criterium
-#' (EBIC) described by Foygel & Drton (2010).
-#'
-#' @param data Data matrix
-#'
-#' @param n Number of participants
-#'
-#' @param gamma EBIC tuning parameter. 0.5 is generally a good choice.
-#' Setting to zero will cause regular BIC to be used.
-#'
-#' @param penalize.diagonal Should the diagonal be penalized?
-#'
-#' @param nlambda Number of lambda values to test.
-#'
-#' @param lambda.min.ratio Ratio of lowest lambda value compared to maximal lambda
-#'
-#' @param returnAllResults   If \code{TRUE} this function does not
-#' return a network but the results of the entire glasso path.
-#'
-#' @param penalizeMatrix Optional logical matrix to indicate which elements are penalized
-#'
-#' @param countDiagonal     Should diagonal be counted in EBIC computation?
-#' Defaults to \code{FALSE}. Set to \code{TRUE} to mimic qgraph < 1.3 behavior (not recommended!).
-#'
-#' @param refit Logical, should the optimal graph be refitted without LASSO regularization?
-#' Defaults to \code{FALSE}.
-#'
-#' @param ... Arguments sent to \code{\link[glasso]{glasso}}
-#'
-#' @details The glasso is run for 100 values of the tuning parameter logarithmically
-#' spaced between the maximal value of the tuning parameter at which all edges are zero,
-#' lambda_max, and lambda_max/100. For each of these graphs the EBIC is computed and
-#' the graph with the best EBIC is selected. The partial correlation matrix
-#' is computed using \code{\link[qgraph]{wi2net}} and returned.
-#'
-#' @return A partial correlation matrix
-#'
-#' @references
-#'
-#' Friedman, J., Hastie, T., & Tibshirani, R. (2008).
-#' Sparse inverse covariance estimation with the graphical lasso.
-#' \emph{Biostatistics}, \emph{9}, 432-441.
-#' doi: \href{https://doi.org/10.1093/biostatistics/kxm045}{10.1093/biostatistics/kxm045}
-#'
-#' #glasso package
-#' Jerome Friedman, Trevor Hastie and Rob Tibshirani (2011).
-#' glasso: Graphical lasso-estimation of Gaussian graphical models.
-#' R package version 1.7.
-#' \url{https://CRAN.R-project.org/package=glasso}
-#'
-#' Foygel, R., & Drton, M. (2010).
-#' Extended Bayesian information criteria for Gaussian graphical models.
-#' In Advances in neural information processing systems (pp. 604-612).
-#' \url{https://papers.nips.cc/paper/4087-extended-bayesian-information-criteria-for-gaussian-graphical-models}
-#'
-#' #psych package
-#' Revelle, W. (2014) psych: Procedures for Personality and Psychological Research,
-#' Northwestern University, Evanston, Illinois, USA.
-#' R package version 1.4.4.
-#' \url{https://CRAN.R-project.org/package=psych}
-#'
-#' #Matrix package
-#' Douglas Bates and Martin Maechler (2014).
-#' Matrix: Sparse and Dense Matrix Classes and Methods.
-#' R package version 1.1-3.
-#' \url{https://CRAN.R-project.org/package=Matrix}
-#'
-#' @author Sacha Epskamp <mail@sachaepskamp.com>
-#'
-#' @examples
-#' ### Using wmt2 dataset from EGAnet ###
-#' data(wmt2)
-#'
-#' \dontrun{
-#' # Compute correlations:
-#' CorMat <- cor_auto(wmt2[,7:24])
-#'
-#' # Compute graph with tuning = 0 (BIC):
-#' BICgraph <- EBICglasso.qgraph(CorMat, nrow(wmt2), 0)
-#'
-#' # Compute graph with tuning = 0.5 (EBIC)
-#' EBICgraph <- EBICglasso.qgraph(CorMat, nrow(wmt2), 0.5)
-#'
-#' }
-#'
-#' @noRd
-#'
-# Computes optimal glasso network based on EBIC:
-# Updated 24.03.2020
-EBICglasso.qgraph <- function(
-    data, # Sample covariance matrix
-    n = NULL,
-    gamma = 0.5,
-    penalize.diagonal = FALSE, # Penalize diagonal?
-    nlambda = 100,
-    lambda.min.ratio = 0.01,
-    returnAllResults = FALSE, # If true, returns a list
-    penalizeMatrix, # Optional logical matrix to indicate which elements are penalized
-    countDiagonal = FALSE, # Set to TRUE to get old qgraph behavior: conting diagonal elements as parameters in EBIC computation. This is not correct, but is included to replicate older analyses
-    refit = FALSE, # If TRUE, network structure is taken and non-penalized version is computed.
-    ... # glasso arguments
-) {
-
-  # Codes originally implemented by Sacha Epskamp in his qgraph package version 1.4.4.
-  # Selects optimal lamba based on EBIC for given covariance matrix.
-  # EBIC is computed as in Foygel, R., & Drton, M. (2010, November). Extended Bayesian Information Criteria for Gaussian Graphical Models. In NIPS (pp. 604-612). Chicago
-
-  # Simply computes the Gaussian log likelihood given sample covariance and estimate of precision:
-
-  # Original:
-  # logGaus <- function(S,K,n)
-  # {
-  #   SK = S %*% K
-  #   tr = function(A) sum(diag(A))
-  #   n/2 * (log(det(K)) - tr(SK))
-  # }
-
-  ## According to huge???
-  logGaus <- function(S,K,n)
-  {
-    KS = K %*% S
-    tr = function(A) sum(diag(A))
-    return(n/2 * (log(det(K)) - tr(KS))  )
-  }
-
-  # Computes the EBIC:
-  EBIC <- function(S,K,n,gamma = 0.5,E,countDiagonal=FALSE)
-  {
-    #   browser()
-    L <- logGaus(S, K, n)
-    if (missing(E)){
-      E <- sum(K[lower.tri(K,diag=countDiagonal)] != 0)
-    }
-    p <- nrow(K)
-
-    # return EBIC:
-    -2 * L + E * log(n) + 4 * E * gamma * log(p)
-  }
-
-  # Computes partial correlation matrix given precision matrix:
-  wi2net <- function(x)
-  {
-    x <- -stats::cov2cor(x)
-    diag(x) <- 0
-    x <- Matrix::forceSymmetric(x)
-    return(x)
-  }
-
-  if(is.null(n))
-  {
-    if(nrow(data)!=ncol(data))
-    {n <- nrow(data)
-    }else{stop("Number of participants 'n' need to be specified")}
-  }
-
-  # Compute correlations matrix
-  if(nrow(data)!=ncol(data))
-  {S <- qgraph::cor_auto(data)
-  }else{
-    S <- data
-  }
-
-  # Compute lambda sequence (code taken from huge package):
-  lambda.max = max(max(S - diag(nrow(S))), -min(S - diag(nrow(S))))
-  lambda.min = lambda.min.ratio*lambda.max
-  lambda = exp(seq(log(lambda.min), log(lambda.max), length = nlambda))
-
-  # Run glasso path:
-  if (missing(penalizeMatrix)){
-    glas_path <- glasso::glassopath(S, lambda, trace = 0, penalize.diagonal=penalize.diagonal, ...)
-  }else{
-    glas_path <- list(
-      w = array(0, c(ncol(S), ncol(S), length(lambda))),
-      wi = array(0, c(ncol(S), ncol(S), length(lambda))),
-      rholist = lambda
-    )
-
-    for (i in 1:nlambda){
-      res <- glasso::glasso(S, penalizeMatrix * lambda[i], trace = 0, penalize.diagonal=penalize.diagonal, ...)
-      glas_path$w[,,i] <- res$w
-      glas_path$wi[,,i] <- res$wi
-    }
-  }
-
-
-  # Compute EBICs:
-  #     EBICs <- apply(glas_path$wi,3,function(C){
-  #       EBIC(S, C, n, gamma)
-  #     })
-
-  lik <- sapply(seq_along(lambda),function(i){
-    logGaus(S, glas_path$wi[,,i], n)
-  })
-
-  EBICs <- sapply(seq_along(lambda),function(i){
-    EBIC(S, glas_path$wi[,,i], n, gamma, countDiagonal=countDiagonal)
-  })
-
-  # Smallest EBIC:
-  opt <- which.min(EBICs)
-
-  # Check if rho is smallest:
-  #if (opt == 1){
-  #  warning("Network with lowest lambda selected as best network. Try setting 'lambda.min.ratio' lower.")
-  #}
-
-  # Return network:
-  net <- as.matrix(Matrix::forceSymmetric(wi2net(glas_path$wi[,,opt])))
-  colnames(net) <- rownames(net) <- colnames(S)
-
-  # Check empty network:
-  if (all(net == 0)){
-    message("An empty network was selected to be the best fitting network. Possibly set 'lambda.min.ratio' higher to search more sparse networks. You can also change the 'gamma' parameter to improve sensitivity (at the cost of specificity).")
-  }
-
-  # Refit network:
-  # Refit:
-  if (refit){
-    message("Refitting network without LASSO regularization")
-    glassoRes <- suppressWarnings(glasso::glasso(S, 0, zero = which(net == 0 & upper.tri(net), arr.ind=TRUE), trace = 0, penalize.diagonal=penalize.diagonal, ...))
-    net <- as.matrix(Matrix::forceSymmetric(wi2net(glassoRes$wi)))
-    colnames(net) <- rownames(net) <- colnames(S)
-    optwi <- glassoRes$wi
-  } else {
-    optwi <- glas_path$wi[,,opt]
-  }
-
-  # Return
-  if (returnAllResults){
-    return(list(
-      results = glas_path,
-      ebic = EBICs,
-      loglik = lik,
-      optnet = net,
-      lambda = lambda,
-      optwi = optwi
-    ))
-  } else return(net)
-}
-
 #' Proportion table
 #'
 #' @param boot.mat Matrix.
@@ -7023,14 +6777,14 @@ expand.grid.unique <- function(x, y, include.equals = FALSE)
 #' Rewiring function
 #' @noRd
 # Updated 16.07.2022
-rewire <- function(network, min = 0.20, max = 0.40, noise = TRUE)
+rewire <- function(network, min = 0.20, max = 0.40, noise = 0.10)
 {
   
   # Number of edges
   edges <- sum(ifelse(network != 0, 1, 0)) / 2
   
   # Add noise
-  if(isTRUE(noise)){
+  if(!is.null(noise)){
     
     # Lower triangle of network
     lower_network <- network[lower.tri(network)]
@@ -7039,8 +6793,8 @@ rewire <- function(network, min = 0.20, max = 0.40, noise = TRUE)
     lower_network[lower_network != 0] <- lower_network[lower_network != 0] +
       runif(
         n = edges,
-        min = -0.10,
-        max = 0.10
+        min = -noise,
+        max = noise
       )
     
     # Replace lower network
@@ -7105,9 +6859,33 @@ rewire <- function(network, min = 0.20, max = 0.40, noise = TRUE)
   
 }
 
-#%%%%%%%%%%%%%%%%%%%%
+
+#%%%%%%%%%%%%
+# dynEGA ----
+#%%%%%%%%%%%%
+
+#' @noRd
+# Updated 28.08.2022
+# GLLA Estimation:
+glla.multi <- function(data, n.embed = n.embed, tau = tau, delta = delta, order = order){
+  order.deriv <- paste0("Ord",seq(from = 0, to = order))
+  data.est <- vector("list")
+  for(i in 1:ncol(data)){
+    data.est[[i]] <- as.data.frame(EGAnet::glla(data[,i], n.embed = n.embed, tau = tau, delta = delta, order = order))
+    data.est[[i]] <- as.data.frame(data.est[[i]])
+  }
+  data.est2 <- vector("list")
+  for(i in 0:order+1){
+    data.est2[[i]] <- sapply(data.est, "[[", i)
+  }
+  data.estimates <- data.frame(Reduce(cbind, data.est2))
+  colnames(data.estimates) <- paste(colnames(data), rep(order.deriv, each = ncol(data)), sep = ".")
+  return(data.estimates)
+}
+
+#%%%%%%%%%%%%%%%%%
 # infoCluster ----
-#%%%%%%%%%%%%%%%%%%%%
+#%%%%%%%%%%%%%%%%%
 
 #' @noRd
 # Variation of information
@@ -7209,6 +6987,255 @@ vn_entropy <- function(L_mat)
 #%%%%%%%%%%%%%%%%%%%%%%
 # SYSTEM FUNCTIONS ----
 #%%%%%%%%%%%%%%%%%%%%%%
+
+#' @noRd
+#'
+# General function to perform
+# system-specific parallelization on lists
+# Updated 02.09.2022
+parallel_process <- function(
+    datalist, # list of data
+    iter = NULL, # number of iterations
+    progress = TRUE, # progress bar
+    FUN, # function to use
+    FUN_args = list(), # arguments to use in function
+    export = NULL, # variables to export (if necessary)
+    ncores # number of cores
+){
+  
+  # Obtain arguments
+  FUN_args <- obtain.arguments(
+    FUN = FUN,
+    FUN.args = FUN_args
+  )
+  
+  # Check for operating system
+  os <- system.check()$OS
+  
+  # Make clusters for Windows
+  if(os == "windows"){
+    cl <- parallel::makeCluster(ncores)
+  }
+  
+  # Set progress bar up
+  if(isTRUE(progress)){
+    
+    # Calculate total computations
+    total_computations <- ifelse(
+      is.null(iter), length(datalist), iter
+    )
+    
+    # Count computations
+    count_computations <- 0
+    
+    # Create data splits (necessary for progress bar)
+    if(total_computations <= 100 | os != "windows"){
+      
+      # Split computations
+      split_computations <- ncores
+      
+      # Set start and end points of data splits
+      split_start <- seq(1, total_computations, split_computations)
+      split_end <- unique(
+        c(
+          seq(split_computations, total_computations, split_computations),
+          total_computations
+        )
+      )
+      
+      # Initialize split list
+      data_split <- vector("list", length = length(split_start))
+      
+      # Populate split list
+      for(i in seq_along(data_split)){
+        data_split[[i]] <- datalist[split_start[i]:split_end[i]]
+      }
+      
+      # Initialize results list
+      results <- vector("list", length = length(data_split))
+      
+      # Initialize runtime updates
+      runtime_update <- seq(
+        0, total_computations, ncores
+      )
+      
+      # Obtain runtime updates
+      runtime_update <- unique(c(runtime_update, total_computations))
+      
+    }else{
+      
+      # Split computations
+      split_computations <- ncores
+      
+      # Set start and end points of data splits
+      split_start <- seq(1, total_computations, split_computations)
+      split_end <- unique(
+        c(
+          seq(split_computations, total_computations, split_computations),
+          total_computations
+        )
+      )
+      
+      # Batch splits
+      batch_computations <- round(total_computations / 100)
+      
+      # Set start and end points of data batches
+      batch_start <- seq(1, length(split_end), batch_computations)
+      batch_end <- unique(
+        c(
+          seq(batch_computations, length(split_end), batch_computations),
+          length(split_start)
+        )
+      )
+      
+      # Initialize batch list
+      data_split <- vector("list", length = length(batch_start))
+      
+      # Populate split list
+      for(j in seq_along(data_split)){
+        data_split[[j]] <- datalist[
+          split_start[batch_start[j]]:split_end[batch_end[j]]
+        ]
+      }
+      
+      # Initialize results list
+      results <- vector("list", length = length(data_split))
+      
+      # Initialize runtime updates
+      runtime_update <- seq(
+        0, total_computations, length(data_split[[1]])
+      )
+      
+      # Obtain runtime updates
+      runtime_update <- unique(c(runtime_update, total_computations))
+    
+    }
+    
+    # Obtain start time
+    if(count_computations == 0){
+      start_time <- Sys.time()
+    }
+    
+    # Loop through data splits
+    for(i in seq_along(data_split)){
+      
+      # Update progress
+      if(count_computations < runtime_update[2]){
+        
+        # Update progress
+        custom_progress(
+          i = count_computations,
+          max = total_computations,
+          start_time = "calculating"
+        )
+        
+      }
+      
+      # Run parallelization
+      if(os == "windows"){
+        
+        # Export objects
+        parallel::clusterExport(
+          cl = cl,
+          varlist = c(
+            "FUN", "FUN_args",
+            export, "data_split"
+          ),
+          envir = environment()
+        )
+        
+        # Perform parallelization
+        results[[i]] <- parallel::parLapply(
+          cl = cl,
+          X = data_split[[i]],
+          fun = function(x){
+            FUN_args[[names(FUN_args)[1]]] <- x
+            return(do.call(FUN, as.list(FUN_args)))
+          }
+        )
+        
+      }else{ # Non-Windows
+        
+        results[[i]] <- parallel::mclapply(
+          X = data_split[[i]],
+          FUN = function(x){
+            FUN_args[[names(FUN_args)[1]]] <- x
+            return(do.call(FUN, as.list(FUN_args)))
+          },
+          mc.cores = ncores
+        )
+        
+      }
+      
+      # Update computation count
+      count_computations <- count_computations +
+        length(data_split[[i]])
+      
+      # Update progress
+      if(count_computations %in% runtime_update){
+        
+        custom_progress(
+          i = count_computations,
+          max = total_computations,
+          start_time = start_time
+        )
+        
+      }
+      
+    }
+    
+    # Unwrap parallelization
+    results <- unlist(results, recursive = FALSE)
+    
+  }else{ # Run without progress
+    
+    # Run parallelization
+    if(os == "windows"){
+      
+      # Export objects
+      parallel::clusterExport(
+        cl = cl,
+        varlist = c(
+          "FUN", "FUN_args",
+          export, "datalist"
+        ),
+        envir = environment()
+      )
+      
+      # Perform parallelization
+      results <- parallel::parLapply(
+        cl = cl,
+        X = datalist,
+        fun = function(x){
+          FUN_args[[names(FUN_args)[1]]] <- x
+          return(do.call(FUN, as.list(FUN_args)))
+        }
+      )
+      
+    }else{ # Non-Windows
+      
+      results <- parallel::mclapply(
+        X = datalist,
+        FUN = function(x){
+          FUN_args[[names(FUN_args)[1]]] <- x
+          return(do.call(FUN, as.list(FUN_args)))
+        },
+        mc.cores = ncores
+      )
+      
+    }
+    
+  }
+  
+  # Stop cluster for Windows
+  if(os == "windows"){
+    parallel::stopCluster(cl)
+  }
+  
+  # Return results
+  return(results)
+  
+}
 
 #' Error report
 #'

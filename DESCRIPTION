@@ -2,8 +2,8 @@ Package: EGAnet
 Title: Exploratory Graph Analysis – a Framework for Estimating the
         Number of Dimensions in Multivariate Data using Network
         Psychometrics
-Version: 1.2.0
-Date: 2022-12-08
+Version: 1.2.3
+Date: 2022-09-05
 Authors@R: c(person("Hudson", "Golino", email = "hfg9s@virginia.edu", role = c("aut", "cre"), comment = c(ORCID = "0000-0002-1601-1447")),
 	     person("Alexander", "Christensen", email = "alexpaulchristensen@gmail.com", role = "aut", comment = c(ORCID = "0000-0002-9798-7037")),
 	     person("Robert", "Moulder", email = "rgm4fd@virginia.edu", role = "ctb", comment = c(ORCID = "0000-0001-7504-9560")),
@@ -23,11 +23,11 @@ Suggests: GPArotation, gridExtra, knitr, markdown, psych, psychTools,
 VignetteBuilder: knitr
 RoxygenNote: 7.2.1
 NeedsCompilation: no
-Packaged: 2022-08-12 17:35:44 UTC; hudson
+Packaged: 2022-09-05 15:25:57 UTC; Hudson
 Author: Hudson Golino [aut, cre] (<https://orcid.org/0000-0002-1601-1447>),
   Alexander Christensen [aut] (<https://orcid.org/0000-0002-9798-7037>),
   Robert Moulder [ctb] (<https://orcid.org/0000-0001-7504-9560>),
   Luis E. Garrido [ctb] (<https://orcid.org/0000-0001-8932-6063>),
   Laura Jamison [ctb] (<https://orcid.org/0000-0002-4656-8684>)
 Repository: CRAN
-Date/Publication: 2022-08-12 17:50:04 UTC
+Date/Publication: 2022-09-05 15:50:02 UTC

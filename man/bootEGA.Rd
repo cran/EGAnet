@@ -23,6 +23,7 @@ bootEGA(
   plot.typicalStructure = TRUE,
   plot.args = list(),
   ncores,
+  progress = TRUE,
   ...
 )
 }
@@ -255,6 +256,11 @@ Set to \code{1} to not use parallel computing
 If you're unsure how many cores your computer has,
 then use the following code: \code{parallel::detectCores()}}
 
+\item{progress}{Boolean.
+Should progress be displayed?
+Defaults to \code{TRUE}.
+For Windows, \code{FALSE} is about 2x faster}
+
 \item{...}{Additional arguments.
 Used for deprecated arguments from previous versions of \code{\link{EGA}}}
 }
@@ -303,10 +309,10 @@ correlations over the \emph{n} bootstraps.
 # Load data
 wmt <- wmt2[,7:24]
 
-\donttest{# Standard EGA example
+\dontrun{
+# Standard EGA example
 boot.wmt <- bootEGA(
-  data = wmt, iter = 100, # recommended 500
-  plot.typicalStructure = FALSE, # No plot for CRAN checks
+  data = wmt, iter = 500,
   type = "parametric", ncores = 2
 )
 
@@ -315,41 +321,36 @@ methods.section(boot.wmt)
 
 # Louvain example
 boot.wmt.louvain <- bootEGA(
-  data = wmt, iter = 100, # recommended 500
+  data = wmt, iter = 500,
   algorithm = "louvain",
-  plot.typicalStructure = FALSE, # No plot for CRAN checks
   type = "parametric", ncores = 2
 )
 
 # Spinglass example
 boot.wmt.spinglass <- bootEGA(
-  data = wmt, iter = 100, # recommended 500
+  data = wmt, iter = 500,
   algorithm = igraph::cluster_spinglass, # use any function from {igraph}
-  plot.typicalStructure = FALSE, # No plot for CRAN checks
   type = "parametric", ncores = 2
 )
 
 # EGA fit example
 boot.wmt.fit <- bootEGA(
-  data = wmt, iter = 100, # recommended 500
+  data = wmt, iter = 500,
   EGA.type = "EGA.fit",
-  plot.typicalStructure = FALSE, # No plot for CRAN checks
   type = "parametric", ncores = 2
 )
 
 # Hierarchical EGA example
 boot.wmt.hier <- bootEGA(
-  data = wmt, iter = 100, # recommended 500
+  data = wmt, iter = 500,
   EGA.type = "hierEGA",
-  plot.typicalStructure = FALSE, # No plot for CRAN checks
   type = "parametric", ncores = 2
 )
 
 # Random-intercept EGA example
 boot.wmt.ri <- bootEGA(
-  data = wmt, iter = 100, # recommended 500
+  data = wmt, iter = 500,
   EGA.type = "riEGA",
-  plot.typicalStructure = FALSE, # No plot for CRAN checks
   type = "parametric", ncores = 2
 )}
 

@@ -90,6 +90,35 @@
 #' @param algorithm.args List.
 #' A list of additional arguments for \code{\link[igraph]{cluster_walktrap}}, \code{\link[igraph]{cluster_louvain}},
 #' or some other community detection algorithm function (see examples)
+#' 
+#' @param uni.method Character.
+#' What unidimensionality method should be used? 
+#' Defaults to \code{"LE"}.
+#' Current options are:
+#' 
+#' \itemize{
+#'
+#' \item{\strong{\code{expand}}}
+#' {Expands the correlation matrix with four variables correlated .50.
+#' If number of dimension returns 2 or less in check, then the data 
+#' are unidimensional; otherwise, regular EGA with no matrix
+#' expansion is used. This is the method used in the Golino et al. (2020)
+#' \emph{Psychological Methods} simulation.}
+#'
+#' \item{\strong{\code{LE}}}
+#' {Applies the Leading Eigenvalue algorithm (\code{\link[igraph]{cluster_leading_eigen}})
+#' on the empirical correlation matrix. If the number of dimensions is 1,
+#' then the Leading Eigenvalue solution is used; otherwise, regular EGA
+#' is used. This is the final method used in the Christensen, Garrido,
+#' and Golino (2021) simulation.}
+#' 
+#' \item{\strong{\code{louvain}}}
+#' {Applies the Louvain algorithm (\code{\link[igraph]{cluster_louvain}})
+#' on the empirical correlation matrix using a resolution parameter = 0.95.
+#' If the number of dimensions is 1, then the Louvain solution is used; otherwise,
+#' regular EGA is used. This method was validated in the Christensen (2022) simulation.}
+#' 
+#' }
 #'
 #' @param ncores Numeric.
 #' Number of cores to use in computing results.
@@ -100,6 +129,11 @@
 #'
 #' If you're unsure how many cores your computer has,
 #' then use the following code: \code{parallel::detectCores()}
+#' 
+#' @param progress Boolean.
+#' Should progress be displayed?
+#' Defaults to \code{TRUE}.
+#' For Windows, \code{FALSE} is about 2x faster
 #'
 #' @param ... Additional arguments.
 #' Used for deprecated arguments from previous versions of \code{\link{EGA}}
@@ -110,23 +144,25 @@
 #' # Obtain data
 #' sim.dynEGA <- sim.dynEGA # bypasses CRAN checks
 #'
-#' \donttest{# Dynamic EGA individual and population structure
+#' \dontrun{
+#' # Dynamic EGA individual and population structure
 #' dyn.ega1 <- dynEGA.ind.pop(
 #'   data = sim.dynEGA, n.embed = 5, tau = 1,
-#'   delta = 1, id = 21, use.derivatives = 1,
+#'   delta = 1, id = 25, use.derivatives = 1,
 #'   ncores = 2, corr = "pearson"
 #' )}
 #'
 #' @export
 #'
-# Updated 14.06.2022
+# Updated 28.08.2022
 dynEGA.ind.pop <- function(data, n.embed, tau = 1, delta = 1,
                            id = NULL,
                            use.derivatives = 1,
                            model = c("glasso", "TMFG"), model.args = list(),
                            algorithm = c("walktrap", "leiden", "louvain"), algorithm.args = list(),
                            corr = c("cor_auto", "pearson", "spearman"),
-                           ncores, ...){
+                           uni.method = c("expand", "LE", "louvain"),
+                           ncores, progress = TRUE, ...){
 
   # Get additional arguments
   add.args <- list(...)
@@ -187,7 +223,8 @@ dynEGA.ind.pop <- function(data, n.embed, tau = 1, delta = 1,
     id = id, use.derivatives = use.derivatives,
     model = model, model.args = model.args,
     algorithm = algorithm, algorithm.args = algorithm.args,
-    corr = corr, ncores = ncores
+    corr = corr, uni.method = uni.method, ncores = ncores,
+    progress = progress
   )
 
   # Stack derivatives
@@ -208,7 +245,7 @@ dynEGA.ind.pop <- function(data, n.embed, tau = 1, delta = 1,
       derivatives_df,
       model = model, model.args = model.args,
       algorithm = algorithm, algorithm.args = algorithm.args,
-      corr = corr, plot.EGA = FALSE
+      corr = corr, uni.method = uni.method, plot.EGA = FALSE
     )
   )
 

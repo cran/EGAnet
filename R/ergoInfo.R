@@ -7,7 +7,7 @@
 #' @param use Character.
 #' A string indicating what network element will be used
 #' to compute the algorithm complexity, the list of edges or the weights of the network.
-#' Defaults to \code{use = "weighted"}.
+#' Defaults to \code{use = "edge.list"}.
 #' Current options are:
 #'
 #' \itemize{
@@ -43,10 +43,11 @@
 #' # Obtain data
 #' sim.dynEGA <- sim.dynEGA # bypasses CRAN checks
 #'
-#' \donttest{# Dynamic EGA individual and population structure
+#' \dontrun{
+#' # Dynamic EGA individual and population structure
 #' dyn.ega1 <- dynEGA.ind.pop(
-#'   data = sim.dynEGA, n.embed = 5, tau = 1,
-#'   delta = 1, id = 21, use.derivatives = 1,
+#'   data = sim.dynEGA[,-26], n.embed = 5, tau = 1,
+#'   delta = 1, id = 25, use.derivatives = 1,
 #'   ncores = 2, corr = "pearson"
 #' )
 #'
@@ -59,7 +60,7 @@
 #' @export
 #'
 # Ergodicity Information Index
-# Updated 18.07.2022
+# Updated 22.08.2022
 ergoInfo <- function(
     dynEGA.object,
     use = c(
@@ -71,7 +72,7 @@ ergoInfo <- function(
 {
 
   #### MISSING ARGUMENTS HANDLING
-  if(missing(use)){use <- "weighted"}
+  if(missing(use)){use <- "edge.list"}
 
   # Check for class
   if(!is(dynEGA.object, "dynEGA.ind.pop")){
@@ -175,7 +176,11 @@ ergoInfo <- function(
     results$KComp <- mean(unlist(individual_kcomp))
     results$KComp.pop <- mean(unlist(population_kcomp))
     results$complexity <- results$KComp / results$KComp.pop
-    results$EII  <- sqrt(dynEGA.pop$dynEGA$n.dim)^((results$KComp/results$KComp.pop)/log(nrow(population_edge_list)))
+    results$EII  <- sqrt(dynEGA.pop$dynEGA$n.dim)^((results$KComp/results$KComp.pop)/log(
+      # nrow(population_edge_list)
+      nrow(edge_list)
+      # ^^ used in Santoro and Nicosia (2020)
+    ))
     results$use <- use
     class(results) <- "EII"
 
@@ -306,7 +311,11 @@ ergoInfo <- function(
     results$KComp <- mean(unlist(individual_kcomp))
     results$KComp.pop <- mean(unlist(population_kcomp))
     results$complexity <- results$KComp / results$KComp.pop
-    results$EII  <- sqrt(dynEGA.pop$dynEGA$n.dim)^((results$KComp/results$KComp.pop)/log(nrow(population_edge_list)))
+    results$EII  <- sqrt(dynEGA.pop$dynEGA$n.dim)^((results$KComp/results$KComp.pop)/log(
+      # nrow(population_edge_list)
+      sum(encoding_matrix != 0) / 2
+      # ^^ used in Santoro and Nicosia (2020)
+    ))
     results$use <- use
     class(results) <- "EII"
 

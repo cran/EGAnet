@@ -15,7 +15,8 @@ simDFM(
   crossreg,
   var.shock,
   cov.shock,
-  burnin = 1000
+  burnin = 1000,
+  variation = FALSE
 )
 }
 \arguments{
@@ -53,6 +54,11 @@ This is the default method}
 \item{cov.shock}{Magnitude of the random shock covariance}
 
 \item{burnin}{Number of n first samples to discard when computing the factor scores. Defaults to 1000.}
+
+\item{variation}{Boolean.
+Whether parameters should be varied.
+Defaults to \code{FALSE}.
+Set to \code{TRUE} to add slight variation to all parameters}
 }
 \description{
 Function to simulate data following a dynamic factor model (DFM). Two DFMs are currently available:
@@ -60,17 +66,12 @@ the direct autoregressive factor score model (Engle & Watson, 1981; Nesselroade,
 dynamic factor model with random walk factor scores.
 }
 \examples{
-
-
 \dontrun{
-\donttest{
 # Estimate EGA network
 data1 <- simDFM(variab = 5, timep = 50, nfact = 3, error = 0.05,
 dfm = "DAFS", loadings = 0.7, autoreg = 0.8,
 crossreg = 0.1, var.shock = 0.18,
-cov.shock = 0.36, burnin = 1000)
- }
-}
+cov.shock = 0.36, burnin = 1000)}
 
 }
 \references{

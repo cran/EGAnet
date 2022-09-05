@@ -10,7 +10,7 @@ EBICglasso.qgraph(
   gamma = 0.5,
   penalize.diagonal = FALSE,
   nlambda = 100,
-  lambda.min.ratio = 0.01,
+  lambda.min.ratio = 0.1,
   returnAllResults = FALSE,
   penalizeMatrix,
   countDiagonal = FALSE,
@@ -30,7 +30,9 @@ Setting to zero will cause regular BIC to be used.}
 
 \item{nlambda}{Number of lambda values to test.}
 
-\item{lambda.min.ratio}{Ratio of lowest lambda value compared to maximal lambda}
+\item{lambda.min.ratio}{Ratio of lowest lambda value compared to maximal lambda.
+Defaults to \code{0.1}.
+\strong{NOTE} \code{\link{qgraph}} sets the default to \code{0.01}}
 
 \item{returnAllResults}{If \code{TRUE} this function does not
 return a network but the results of the entire glasso path.}
@@ -67,7 +69,8 @@ is computed using \code{\link[qgraph]{wi2net}} and returned.
 # Obtain data
 wmt <- wmt2[,7:24]
 
-\donttest{# Compute graph with tuning = 0 (BIC)
+\dontrun{
+# Compute graph with tuning = 0 (BIC)
 BICgraph <- EBICglasso.qgraph(
   data = wmt, gamma = 0
 )

@@ -234,6 +234,11 @@
 #'
 #' If you're unsure how many cores your computer has,
 #' then use the following code: \code{parallel::detectCores()}
+#' 
+#' @param progress Boolean.
+#' Should progress be displayed?
+#' Defaults to \code{TRUE}.
+#' For Windows, \code{FALSE} is about 2x faster
 #'
 #' @param ... Additional arguments.
 #' Used for deprecated arguments from previous versions of \code{\link{EGA}}
@@ -276,11 +281,11 @@
 #' @examples
 #' # Load data
 #' wmt <- wmt2[,7:24]
-#'
-#' \donttest{# Standard EGA example
+#' 
+#' \dontrun{
+#' # Standard EGA example
 #' boot.wmt <- bootEGA(
-#'   data = wmt, iter = 100, # recommended 500
-#'   plot.typicalStructure = FALSE, # No plot for CRAN checks
+#'   data = wmt, iter = 500,
 #'   type = "parametric", ncores = 2
 #' )
 #' 
@@ -289,41 +294,36 @@
 #' 
 #' # Louvain example
 #' boot.wmt.louvain <- bootEGA(
-#'   data = wmt, iter = 100, # recommended 500
+#'   data = wmt, iter = 500,
 #'   algorithm = "louvain",
-#'   plot.typicalStructure = FALSE, # No plot for CRAN checks
 #'   type = "parametric", ncores = 2
 #' )
 #' 
 #' # Spinglass example
 #' boot.wmt.spinglass <- bootEGA(
-#'   data = wmt, iter = 100, # recommended 500
+#'   data = wmt, iter = 500,
 #'   algorithm = igraph::cluster_spinglass, # use any function from {igraph}
-#'   plot.typicalStructure = FALSE, # No plot for CRAN checks
 #'   type = "parametric", ncores = 2
 #' )
 #'
 #' # EGA fit example
 #' boot.wmt.fit <- bootEGA(
-#'   data = wmt, iter = 100, # recommended 500
+#'   data = wmt, iter = 500,
 #'   EGA.type = "EGA.fit",
-#'   plot.typicalStructure = FALSE, # No plot for CRAN checks
 #'   type = "parametric", ncores = 2
 #' )
 #' 
 #' # Hierarchical EGA example
 #' boot.wmt.hier <- bootEGA(
-#'   data = wmt, iter = 100, # recommended 500
+#'   data = wmt, iter = 500,
 #'   EGA.type = "hierEGA",
-#'   plot.typicalStructure = FALSE, # No plot for CRAN checks
 #'   type = "parametric", ncores = 2
 #' )
 #' 
 #' # Random-intercept EGA example
 #' boot.wmt.ri <- bootEGA(
-#'   data = wmt, iter = 100, # recommended 500
+#'   data = wmt, iter = 500,
 #'   EGA.type = "riEGA",
-#'   plot.typicalStructure = FALSE, # No plot for CRAN checks
 #'   type = "parametric", ncores = 2
 #' )}
 #'
@@ -347,7 +347,7 @@
 #' @export
 #'
 # Bootstrap EGA
-# Updated 18.07.2022
+# Updated 28.08.2022
 bootEGA <- function(
     data, n = NULL, uni.method = c("expand", "LE", "louvain"), iter,
     type = c("parametric", "resampling"), seed = 1234,
@@ -362,21 +362,21 @@ bootEGA <- function(
       "lowest_tefi"
     ), consensus.iter = 100,
     typicalStructure = TRUE, plot.typicalStructure = TRUE,
-    plot.args = list(), ncores, ...
+    plot.args = list(), ncores, progress = TRUE, ...
 ) 
 {
   
   # Make data a matrix
   data <- as.matrix(data)
-
+  
   #### DEPRECATED ARGUMENTS
-
+  
   # Get additional arguments
   add.args <- list(...)
-
+  
   # Check if steps has been input as an argument
   if("steps" %in% names(add.args)){
-
+    
     # Give deprecation warning
     warning(
       paste(
@@ -384,26 +384,26 @@ bootEGA <- function(
         sep = ""
       )
     )
-
+    
     # Handle the number of steps appropriately
     algorithm.args$steps <- add.args$steps
   }
-
+  
   # Check if uni has been input as an argument
   if("uni" %in% names(add.args)){
-
+    
     # Give deprecation warning
     warning(
       "The 'uni' argument has been deprecated in all EGA functions."
     )
   }
-
+  
   #### MISSING ARGUMENTS HANDLING
-
+  
   if(missing(uni.method)){
     uni.method <- "LE"
   }else{uni.method <- match.arg(uni.method)}
-
+  
   if(missing(corr)){
     corr <- "cor_auto"
   }else{corr <- match.arg(corr)}
@@ -411,11 +411,11 @@ bootEGA <- function(
   if(missing(EGA.type)){
     EGA.type <- "EGA"
   }else{EGA.type <- match.arg(EGA.type)}
-
+  
   if(missing(model)){
     model <- "glasso"
   }else{model <- match.arg(model)}
-
+  
   if(missing(algorithm)){
     algorithm <- "walktrap"
   }else if(!is.function(algorithm)){
@@ -423,7 +423,7 @@ bootEGA <- function(
   }else{
     algorithm <- algorithm
   }
-
+  
   if(missing(type)){
     type <- "parametric"
   }else{type <- match.arg(type)}
@@ -432,25 +432,25 @@ bootEGA <- function(
     consensus.method <- "most_common"
   }else{consensus.method <- tolower(match.arg(consensus.method))}
   
-
+  
   if(missing(ncores)){
     ncores <- ceiling(parallel::detectCores() / 2)
   }
-
+  
   ## Check for input plot arguments
   if("color.palette" %in% names(plot.args)){
     color.palette <- plot.args$color.palette
   }else{color.palette <- "polychrome"}
-
+  
   #number of cases
   if(is.null(n)){
-
+    
     if(isSymmetric(as.matrix(data))){
       stop("The argument 'n' is missing for a symmetric matrix")
     }else{
       cases <- nrow(data)
     }
-
+    
   }else{
     cases <- n
   }
@@ -509,18 +509,18 @@ bootEGA <- function(
     ega_output <- empirical_EGA
   }
   
-
+  
   #set inverse covariance matrix for parametric approach
   if(type == "parametric"){  # Use a parametric approach
-
+    
     ## Compute correlation matrix
     cor.data <- ega_output$correlation
-
+    
     # Generating data will be continuous
     corr.method <- "pearson"
-
+    
   }else if(type == "resampling"){
-
+    
     # Check if matrix is symmetric
     if(isSymmetric(as.matrix(data))){
       warning("The argument 'data' is symmetric and therefore treated as a correlation matrix. Parametric bootstrap will be used instead")
@@ -529,9 +529,9 @@ bootEGA <- function(
     }else{
       corr.method <- corr
     }
-
+    
   }
-
+  
   # Set seed
   set.seed(seed)
   
@@ -541,59 +541,47 @@ bootEGA <- function(
   
   #initialize data list
   datalist <- list()
-
+  
   #initialize count
   count <- 0
-
+  
   #let user know data generation has started
   message("Generating data...", appendLF = FALSE)
-
+  
   repeat{
-
+    
     #increase count
     count <- count + 1
-
+    
     #generate data
     if(type == "parametric"){
-
+      
       datalist[[count]] <- MASS_mvrnorm(cases, mu = rep(0, ncol(cor.data)), Sigma = cor.data)
-
+      
     }else if(type == "resampling"){
-
+      
       datalist[[count]] <- data[sample(1:cases, replace=TRUE),]
-
+      
     }
-
+    
     #break out of repeat
     if(count == iter)
     {break}
   }
-
+  
   #let user know data generation has ended
   message("done", appendLF = TRUE)
-
-  #Parallel processing
-  cl <- parallel::makeCluster(ncores)
-
-  # #Export variables
-  parallel::clusterExport(
-    cl = cl,
-    varlist = c("ega_function", "ega_args"),
-    envir=environment()
+  
+  # Perform bootstrap using parallel processing
+  # See in `utils-EGAnet`
+  boots <- parallel_process(
+    datalist = datalist,
+    iter = iter,
+    progress = progress,
+    FUN = ega_function,
+    FUN_args = ega_args,
+    ncores = ncores
   )
-
-  #let user know data generation has started
-  message("Estimating EGA networks...\n", appendLF = FALSE)
-
-  #Estimate networks
-  boots <- pbapply::pblapply(
-    X = datalist, cl = cl,
-    FUN = function(x){
-      do.call(ega_function, ega_args)
-    }
-  )
-
-  parallel::stopCluster(cl)
   
   # Bootstrap output
   if("EGA" %in% names(boots[[1]])){
@@ -620,10 +608,10 @@ bootEGA <- function(
     # Assume output is from standard EGA
     boot_output <- boots
   }
-
+  
   #let user know results are being computed
   message("Computing results...\n")
-
+  
   #get networks
   bootGraphs <- lapply(boot_output, function(x, col.names){
     net <- x$network
@@ -631,38 +619,38 @@ bootEGA <- function(
     row.names(net) <- col.names
     return(net)
   }, col.names = colnames(data))
-
+  
   #get community membership
   boot.wc <- lapply(boot_output, function(x, col.names){
     wc <- x$wc
     names(wc) <- col.names
     return(wc)
   }, col.names = colnames(data))
-
+  
   #get dimensions
   boot.ndim <- matrix(NA, nrow = iter, ncol = 2)
   colnames(boot.ndim) <- c("Boot.Number", "N.Dim")
-
+  
   boot.ndim[,1] <- seq_len(iter)
   boot.ndim[,2] <- unlist(
     lapply(boot_output, function(x){
       x$n.dim
     })
   )
-
+  
   if (typicalStructure){
-
+    
     typical.Structure <- switch(
       model,
       "glasso" = apply(simplify2array(bootGraphs),1:2, median),
       "TMFG" = apply(simplify2array(bootGraphs),1:2, mean)
       
     )
-
+    
     # Sub-routine to following EGA approach (handles unidimensional structures)
     typical.wc <- suppressWarnings(
       suppressMessages(
-
+        
         typicalStructure.network(
           A = typical.Structure, corr = corr,
           model = model, model.args = model.args,
@@ -671,17 +659,17 @@ bootEGA <- function(
           consensus.method = consensus.method,
           consensus.iter = consensus.iter
         )
-
+        
       )
     )
-
+    
     typical.ndim <- length(na.omit(unique(typical.wc)))
-
+    
     if(typical.ndim == 1){typical.wc[1:length(typical.wc)] <- 1}
-
+    
     dim.variables <- data.frame(items = colnames(data), dimension = typical.wc)
   }
-
+  
   Median <- median(boot.ndim[, 2], na.rm = TRUE)
   se.boot <- sd(boot.ndim[, 2], na.rm = TRUE)
   ciMult <- qt(0.95/2 + 0.5, nrow(boot.ndim) - 1)
@@ -692,13 +680,13 @@ bootEGA <- function(
                               Lower.CI = Median - ci, Upper.CI = Median + ci,
                               Lower.Quantile = quant[1], Upper.Quantile = quant[2])
   row.names(summary.table) <- NULL
-
+  
   #compute frequency
   dim.range <- range(boot.ndim[,2], na.rm = TRUE)
   lik <- matrix(0, nrow = diff(dim.range)+1, ncol = 2)
   colnames(lik) <- c("# of Factors", "Frequency")
   count <- 0
-
+  
   for(i in seq(from=min(dim.range),to=max(dim.range),by=1)){
     count <- count + 1
     lik[count,1] <- i
@@ -731,45 +719,15 @@ bootEGA <- function(
       })
     )
     
-    if (typicalStructure){
-      
-      typical.Structure_higher <- switch(model,
-                                  "glasso" = apply(simplify2array(bootGraphs_higher),1:2, median),
-                                  "TMFG" = apply(simplify2array(bootGraphs_higher),1:2, mean)
-      )
-      
-      # Sub-routine to following EGA approach (handles undimensional structures)
-      typical.wc_higher <- suppressWarnings(
-        suppressMessages(
-          
-          typicalStructure.network(
-            A = typical.Structure_higher, corr = corr,
-            model = model, model.args = model.args,
-            n = cases, uni.method = uni.method, algorithm = algorithm,
-            algorithm.args = algorithm.args,
-            consensus.method = consensus.method,
-            consensus.iter = consensus.iter
-          )
-          
-        )
-      )
-      
-      typical.ndim_higher <- length(na.omit(unique(typical.wc_higher)))
-      
-      if(typical.ndim_higher == 1){typical.wc_higher[1:length(typical.wc_higher)] <- 1}
-      
-      dim.variables_higher <- data.frame(items = names(typical.wc_higher), dimension = typical.wc_higher)
-    }
-    
     Median_higher <- median(boot.ndim_higher[, 2], na.rm = TRUE)
     se.boot_higher <- sd(boot.ndim_higher[, 2], na.rm = TRUE)
     ciMult_higher <- qt(0.95/2 + 0.5, nrow(boot.ndim_higher) - 1)
     ci_higher <- se.boot_higher * ciMult_higher
     quant_higher <- quantile(boot.ndim_higher[,2], c(.025, .975), na.rm = TRUE)
     summary.table_higher <- data.frame(n.Boots = iter, median.dim = Median_higher,
-                                SE.dim = se.boot_higher, CI.dim = ci_higher,
-                                Lower.CI = Median_higher - ci_higher, Upper.CI = Median_higher + ci_higher,
-                                Lower.Quantile = quant_higher[1], Upper.Quantile = quant_higher[2])
+                                       SE.dim = se.boot_higher, CI.dim = ci_higher,
+                                       Lower.CI = Median_higher - ci_higher, Upper.CI = Median_higher + ci_higher,
+                                       Lower.Quantile = quant_higher[1], Upper.Quantile = quant_higher[2])
     row.names(summary.table_higher) <- NULL
     
     #compute frequency
@@ -788,7 +746,7 @@ bootEGA <- function(
   
   # Reset seed
   set.seed(NULL)
-
+  
   # Set up result list
   if(tolower(EGA.type) == "hierega"){
     result <- list(
@@ -805,10 +763,10 @@ bootEGA <- function(
       EGA = ega_output, EGA.type = EGA.type
     )
   }
-
+  
   # Typical structure
   if (typicalStructure) {
-
+    
     typicalGraph <- list(
       graph = typical.Structure,
       typical.dim.variables = dim.variables[order(dim.variables[,2]), ],
@@ -829,73 +787,26 @@ bootEGA <- function(
       summary.table = summary.table_higher, frequency = lik_higher
     )
     
-    # Typical structure
-    if (typicalStructure) {
-      
-      typicalGraph_higher <- list(
-        graph = typical.Structure_higher,
-        typical.dim.variables = dim.variables_higher[order(dim.variables_higher[,2]), ],
-        wc = typical.wc_higher
-      )
-      
-      result_higher$typicalGraph <- typicalGraph_higher
-      
-    }
-    
   }
-
+  
   # Add plot arguments (for itemStability)
   result$color.palette <- color.palette
-
+  
   class(result) <- "bootEGA"
   
   if(tolower(EGA.type) == "hierega"){
     class(result_higher) <- "bootEGA"
   }
-
+  
   if(typicalStructure & plot.typicalStructure){
     
-    if(tolower(EGA.type) != "hierega"){
-      result$plot.typical.ega <- plot(
-        result,
-        plot.args = plot.args
-      )
-    }else{
-      
-      # Set up output
-      hier_plot <- suppressMessages(
-        suppressWarnings(
-          suppressPackageStartupMessages(
-            ggpubr::ggarrange(
-              plot(
-                result,
-                plot.args = plot.args,
-                produce = FALSE
-              ), # plot lower-order
-              plot(
-                result_higher,
-                plot.args = plot.args,
-                produce = FALSE
-              ), # plot higher-order
-              labels = c("Lower Order", "Higher Order")
-            )
-          )
-        )
-      )
-      
-      # Output plots
-      result$plot.typical.ega <- suppressMessages(
-        suppressWarnings(
-          suppressPackageStartupMessages(
-            plot(hier_plot)
-          )
-        )
-      )
-      
-    }
-  
+    result$plot.typical.ega <- plot(
+      result,
+      plot.args = plot.args
+    )
+    
   }
-
+  
   # Check if uni.method = "LE" has been used
   if(uni.method == "LE"){
     # Give change warning
@@ -927,7 +838,7 @@ bootEGA <- function(
     )
     
   }
-
+  
   return(result)
   
 }

@@ -16,7 +16,9 @@ dynEGA.ind.pop(
   algorithm = c("walktrap", "leiden", "louvain"),
   algorithm.args = list(),
   corr = c("cor_auto", "pearson", "spearman"),
+  uni.method = c("expand", "LE", "louvain"),
   ncores,
+  progress = TRUE,
   ...
 )
 }
@@ -105,6 +107,35 @@ the \code{\link[stats]{cor}}} function.
 the \code{\link[stats]{cor}}} function.
 }}
 
+\item{uni.method}{Character.
+What unidimensionality method should be used? 
+Defaults to \code{"LE"}.
+Current options are:
+
+\itemize{
+
+\item{\strong{\code{expand}}}
+{Expands the correlation matrix with four variables correlated .50.
+If number of dimension returns 2 or less in check, then the data 
+are unidimensional; otherwise, regular EGA with no matrix
+expansion is used. This is the method used in the Golino et al. (2020)
+\emph{Psychological Methods} simulation.}
+
+\item{\strong{\code{LE}}}
+{Applies the Leading Eigenvalue algorithm (\code{\link[igraph]{cluster_leading_eigen}})
+on the empirical correlation matrix. If the number of dimensions is 1,
+then the Leading Eigenvalue solution is used; otherwise, regular EGA
+is used. This is the final method used in the Christensen, Garrido,
+and Golino (2021) simulation.}
+
+\item{\strong{\code{louvain}}}
+{Applies the Louvain algorithm (\code{\link[igraph]{cluster_louvain}})
+on the empirical correlation matrix using a resolution parameter = 0.95.
+If the number of dimensions is 1, then the Louvain solution is used; otherwise,
+regular EGA is used. This method was validated in the Christensen (2022) simulation.}
+
+}}
+
 \item{ncores}{Numeric.
 Number of cores to use in computing results.
 Defaults to \code{parallel::detectCores() / 2} or half of your
@@ -114,6 +145,11 @@ Recommended to use maximum number of cores minus one
 
 If you're unsure how many cores your computer has,
 then use the following code: \code{parallel::detectCores()}}
+
+\item{progress}{Boolean.
+Should progress be displayed?
+Defaults to \code{TRUE}.
+For Windows, \code{FALSE} is about 2x faster}
 
 \item{...}{Additional arguments.
 Used for deprecated arguments from previous versions of \code{\link{EGA}}}
@@ -129,10 +165,11 @@ GLLA is a filtering method for estimating derivatives from data that uses time d
 # Obtain data
 sim.dynEGA <- sim.dynEGA # bypasses CRAN checks
 
-\donttest{# Dynamic EGA individual and population structure
+\dontrun{
+# Dynamic EGA individual and population structure
 dyn.ega1 <- dynEGA.ind.pop(
   data = sim.dynEGA, n.embed = 5, tau = 1,
-  delta = 1, id = 21, use.derivatives = 1,
+  delta = 1, id = 25, use.derivatives = 1,
   ncores = 2, corr = "pearson"
 )}
 

@@ -61,10 +61,12 @@
 #' \item{mean.loadings}{Matrix of the average standardized network loading
 #' (computed using \code{\link[EGAnet]{net.loads}}) for each item in each dimension}
 #'
-#' @examples # Load data
+#' @examples
+#' # Load data
 #' wmt <- wmt2[,7:24]
 #'
-#' \donttest{# Standard EGA example
+#' \dontrun{
+#' # Standard EGA example
 #' boot.wmt <- bootEGA(
 #'   data = wmt, iter = 100, # recommended 500
 #'   plot.typicalStructure = FALSE, # No plot for CRAN checks
@@ -72,10 +74,7 @@
 #' )
 #' 
 #' # Standard item stability 
-#' wmt.is <- itemStability(
-#'   boot.wmt,
-#'   IS.plot = FALSE # NO plot for CRAN checks
-#' )
+#' wmt.is <- itemStability(boot.wmt)
 #' 
 #' # Produce Methods section
 #' methods.section(
@@ -85,45 +84,33 @@
 #'
 #' # EGA fit example
 #' boot.wmt.fit <- bootEGA(
-#'   data = wmt, iter = 100, # recommended 500
+#'   data = wmt, iter = 500,
 #'   EGA.type = "EGA.fit",
-#'   plot.typicalStructure = FALSE, # No plot for CRAN checks
 #'   type = "parametric", ncores = 2
 #' )
 #' 
 #' # EGA fit item stability 
-#' wmt.is.fit <- itemStability(
-#'   boot.wmt.fit,
-#'   IS.plot = FALSE # NO plot for CRAN checks
-#' )
+#' wmt.is.fit <- itemStability(boot.wmt.fit)
 #' 
 #' # Hierarchical EGA example
 #' boot.wmt.hier <- bootEGA(
-#'   data = wmt, iter = 100, # recommended 500
+#'   data = wmt, iter = 500,
 #'   EGA.type = "hierEGA",
-#'   plot.typicalStructure = FALSE, # No plot for CRAN checks
 #'   type = "parametric", ncores = 2
 #' )
 #' 
 #' # Hierarchical EGA item stability 
-#' wmt.is.hier <- itemStability(
-#'   boot.wmt.hier,
-#'   IS.plot = FALSE # NO plot for CRAN checks
-#' )
+#' wmt.is.hier <- itemStability(boot.wmt.hier)
 #' 
 #' # Random-intercept EGA example
 #' boot.wmt.ri <- bootEGA(
-#'   data = wmt, iter = 100, # recommended 500
+#'   data = wmt, iter = 500,
 #'   EGA.type = "riEGA",
-#'   plot.typicalStructure = FALSE, # No plot for CRAN checks
 #'   type = "parametric", ncores = 2
 #' )
 #' 
 #' # Random-intercept EGA item stability 
-#' wmt.is.ri <- itemStability(
-#'   boot.wmt.ri,
-#'   IS.plot = FALSE # NO plot for CRAN checks
-#' )}
+#' wmt.is.ri <- itemStability(boot.wmt.ri)}
 #'
 #' @references
 #' Christensen, A. P., & Golino, H. (2021).
@@ -141,7 +128,7 @@
 #'
 #' @export
 #Item Stability function
-# Updated 18.07.2022
+# Updated 28.08.2022
 # Major revamp 27.02.2021
 itemStability <- function (bootega.obj, IS.plot = TRUE, structure = NULL, ...){
 
@@ -190,23 +177,25 @@ itemStability <- function (bootega.obj, IS.plot = TRUE, structure = NULL, ...){
     )
     
     # Add plot
-    results$plot <- ggpubr::ggarrange(
-      lower_is$plot +
-        ggplot2::ggtitle("Lower Order") +
-        ggplot2::theme(
-          plot.title = ggplot2::element_text(hjust = 0.5, face = "bold")
-        ),
-      higher_is$plot +
-        ggplot2::ggtitle("Higher Order") +
-        ggplot2::theme(
-          plot.title = ggplot2::element_text(hjust = 0.5, face = "bold")
-        ),
-      nrow = 1, ncol = 2
-    )
-    
-    # Plot to user?
-    if(IS.plot){
-      plot(results$plot)
+    if("plot" %in% names(higher_is)){
+      results$plot <- ggpubr::ggarrange(
+        lower_is$plot +
+          ggplot2::ggtitle("Lower Order") +
+          ggplot2::theme(
+            plot.title = ggplot2::element_text(hjust = 0.5, face = "bold")
+          ),
+        higher_is$plot +
+          ggplot2::ggtitle("Higher Order") +
+          ggplot2::theme(
+            plot.title = ggplot2::element_text(hjust = 0.5, face = "bold")
+          ),
+        nrow = 1, ncol = 2
+      )
+      
+      # Plot to user?
+      if(IS.plot){
+        plot(results$plot)
+      }
     }
     
     # Return result
@@ -284,6 +273,12 @@ itemStability <- function (bootega.obj, IS.plot = TRUE, structure = NULL, ...){
   bootstrap.membership <- simplify2array(bootega.obj$boot.wc)
 
   # Homogenize memberships
+  if(is.list(bootstrap.membership)){
+    message("Differing number of variables were attempted to be compared. This result can occur when there are a different number of higher order dimensions detected. Skipping stability metrics...")
+  
+    return(NULL)
+  }
+  
   final.membership <- try(
     homogenize.membership(membership.numeric, bootstrap.membership),
     silent = TRUE
