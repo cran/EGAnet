@@ -1,254 +1,240 @@
-#' Visually Compares \code{\link{EGAnet}} plots
+#' @title Visually Compare Two or More \code{\link{EGAnet}} plots
 #' 
-#' @description Organizes EGA plots for comparison. Ensures that nodes are
-#' placed in the same layout to maximize comparison. Community memberships
-#' are also homogenized across EGA outputs to enhance interpretation
+#' @description Organizes EGA plots for comparison. Ensures that 
+#' nodes are placed in the same layout to maximize comparison
 #'
-#' @param ... \code{\link{EGAnet}} objects
+#' @param ... Handles multiple arguments:
+#' 
+#' \itemize{
+#' 
+#' \item{\code{*EGA} objects --- }
+#' {can be dropped in without any argument
+#' designation. The function will search across input to find
+#' necessary \code{\link{EGAnet}} objects}
+#' 
+#' \item{\code{\link[GGally]{ggnet2}} arguments --- }
+#' {can be passed along to \code{\link[GGally]{ggnet2}}}
+#' 
+#' \item{\code{\link[sna]{gplot.layout}} --- }
+#' {can be specified using \code{mode = } or
+#' \code{layout = } using the name of the layout
+#' (e.g., \code{mode = "circle"} will produce the 
+#' circle layout from \link[sna]{gplot.layout}).
+#' By default, the layout is the same as \code{\link{qgraph}}}
+#'
+#' }
 #' 
 #' @param input.list List.
 #' Bypasses \code{...} argument in favor of using a list
 #' as an input
 #' 
-#' @param base.plot Numeric.
+#' @param base Numeric (length = 1).
 #' Plot to be used as the base for the configuration of the networks.
 #' Uses the number of the order in which the plots are input.
 #' Defaults to \code{1} or the first plot
 #' 
-#' @param labels Character vector.
+#' @param labels Character (same length as input).
 #' Labels for each \code{\link{EGAnet}} object
 #' 
-#' @param rows Numeric.
+#' @param rows Numeric (length = 1).
 #' Number of rows to spread plots across
 #' 
-#' @param columns Numeric.
+#' @param columns Numeric (length = 1).
 #' Number of columns to spread plots down
-#' 
-#' @param plot.args List.
-#' A list of additional arguments for the network plot.
-#' For \code{plot.type = "qgraph"}:
-#'
-#' \itemize{
-#'
-#' \item{\strong{\code{vsize}}}
-#' {Size of the nodes. Defaults to 6.}
-#'
-#' }
-#' 
-#' (see \code{\link[GGally]{ggnet2}} for
-#' full list of arguments):
-#'
-#' \itemize{
-#'
-#' \item{\strong{\code{vsize}}}
-#' {Size of the nodes. Defaults to 6.}
-#'
-#' \item{\strong{\code{label.size}}}
-#' {Size of the labels. Defaults to 5.}
-#'
-#' \item{\strong{\code{alpha}}}
-#' {The level of transparency of the nodes, which might be a single value or a vector of values. Defaults to 0.7.}
-#'
-#' \item{\strong{\code{edge.alpha}}}
-#' {The level of transparency of the edges, which might be a single value or a vector of values. Defaults to 0.4.}
-#'
-#'  \item{\strong{\code{legend.names}}}
-#' {A vector with names for each dimension}
-#'
-#' \item{\strong{\code{color.palette}}}
-#' {The color palette for the nodes. For custom colors,
-#' enter HEX codes for each dimension in a vector.
-#' See \code{\link[EGAnet]{color_palette_EGA}} for
-#' more details and examples}
-#'
-#' }
 #'
 #' @return Visual comparison of \code{\link{EGAnet}} objects
 #' 
 #' @examples
-#' # Obtain SAPA items
-#' items <- psychTools::spi[,c(11:20)]
+#' # Obtain WMT-2 data
+#' wmt <- wmt2[,7:24]
 #' 
-#' # Draw random samples
-#' sample1 <- items[sample(1:nrow(items), 1000),]
-#' sample2 <- items[sample(1:nrow(items), 1000),]
+#' # Draw random samples of 300 cases
+#' sample1 <- wmt[sample(1:nrow(wmt), 300),]
+#' sample2 <- wmt[sample(1:nrow(wmt), 300),]
 #' 
-#' \dontrun{
 #' # Estimate EGAs
 #' ega1 <- EGA(sample1)
 #' ega2 <- EGA(sample2)
 #' 
+#' \donttest{
 #' # Compare EGAs via plot
 #' compare.EGA.plots(
 #'   ega1, ega2,
-#'   base.plot = 1, # use "ega1" as base for comparison
+#'   base = 1, # use "ega1" as base for comparison
 #'   labels = c("Sample 1", "Sample 2"),
 #'   rows = 1, columns = 2
+#' )
+#' 
+#' # Change layout to circle plots
+#' compare.EGA.plots(
+#'   ega1, ega2,
+#'   labels = c("Sample 1", "Sample 2"),
+#'   mode = "circle"
 #' )}
 #' 
 #' @author Alexander Christensen <alexpaulchristensen@gmail.com>
+#' 
+#' @seealso \code{\link[EGAnet]{plot.EGAnet}} for plot usage in \code{\link{EGAnet}}
 #'
 #' @export
 #
-# Compare EGA plots function
-# Updated 18.07.2022
+# Compare EGA plots ----
+# Updated 09.08.2023
 compare.EGA.plots <- function(
-  ..., input.list = NULL,
-  base.plot = 1,
-  labels, rows, columns,
-  plot.args = list()
+  ..., input.list = NULL, base = 1,
+  labels = NULL, rows = NULL, columns = NULL
 )
 {
-  # Check for input list
+  
+  # Start with ellipse objects/arguments
+  ellipse <- list(...)
+  
+  # Determine whether it's necessary to search for
+  # plots in the ellipse
   if(is.null(input.list)){
-    object.list <- list(...)
-  }else{
-    object.list <- input.list
-  }
-  
-  # Identify EGA objects
-  EGA.idx <- grep("EGA", unlist(lapply(object.list, class)))
-  
-  # Obtain EGA objects only
-  object.list <- object.list[EGA.idx]
-  
-  # Obtain names
-  name <- names(object.list)
-  
-  # Missing arguments
-  if(missing(rows)){
-    rows <- 1
-  }
-  
-  if(missing(columns)){
-    columns <- length(object.list)
-  }
-  
-  if(missing(labels)){
-    labels <- name
-  }
-  
-  # Check for at least two objects
-  if(length(object.list) < 2){
-    stop("EGA plot comparisons require two or more EGA objects")
-  }
-  
-  # Obtain base EGA
-  base_EGA <- object.list[[base.plot]]
-  
-  # Comparison EGAs
-  comparison_EGA <- object.list[-base.plot]
-  
-  # Set up number of communities (for legend later)
-  num_wc <- numeric(length(object.list))
-  num_wc[1] <- switch(
-    class(base_EGA),
-    "EGA" = length(na.omit(unique(base_EGA$wc))),
-    "bootEGA" = length(na.omit(unique(base_EGA$typicalGraph$wc))),
-    "dynEGA" = length(na.omit(unique(base_EGA$dynEGA$wc)))
-  )
-  
-  # Organize memberships
-  for(i in 1:length(comparison_EGA)){
     
-    # Target membership
-    target.wc <- switch(
-      class(base_EGA),
-      "EGA" = base_EGA$wc,
-      "bootEGA" = base_EGA$typicalGraph$wc,
-      "dynEGA" = base_EGA$dynEGA$wc
+    # Get classes for all input
+    classes <- lapply(ellipse, class)
+    
+    # Determine which inputs are `EGA`
+    ega_object <- lvapply(classes, function(x){grepl("EGA", x)})
+    
+    # Check for no `EGA` objects
+    if(!any(ega_object)){
+      .handleSimpleError(
+        h = stop,
+        msg = "The 'input.list' was `NULL` and there were no `EGA` class objects detected.",
+        call = "compare.EGA.plots"
+      )
+    }
+    
+    # Extract `EGA` objects from list
+    input.list <- ellipse[ega_object]
+    ellipse <- ellipse[!ega_object]
+    
+  }
+  
+  # With the input list, there could be different types of
+  # `EGA` objects... let's figure that out
+  ega_classes <- cvapply(input.list, class)
+  
+  # Separate `dynEGA` from rest of `EGA` functions
+  dynega_classes <- grepl("dynEGA", ega_classes)
+  
+  # Separate input list
+  ega_input <- input.list[!dynega_classes]
+  dynega_input <- input.list[dynega_classes]
+  
+  # For `EGA` input, extract `EGA` objects
+  if(length(ega_input) != 0){
+    ega_list <- lapply(ega_input, get_EGA_object)
+  }else{ # Set up empty list
+    ega_list <- list()
+  }
+  
+  # For `dynEGA` input, extract `EGA` objects
+  if(length(dynega_input) != 0){
+    
+    # Extract `dynEGA` objects
+    dynega_objects <- ulapply(
+      dynega_input, get_EGA_object, recursive = FALSE
     )
     
-    # Covert membership
-    convert.wc <- as.matrix(
-      switch(
-        class(comparison_EGA[[i]]),
-        "EGA" = comparison_EGA[[i]]$wc,
-        "bootEGA" = comparison_EGA[[i]]$typicalGraph$wc,
-        "dynEGA" = comparison_EGA[[i]]$dynEGA$wc
+    # Check for `population` objects
+    population_objects <- names(dynega_objects) == "population"
+    
+    # Separate `population` objects from the rest
+    dynega_population <- dynega_objects[population_objects]
+    dynega_other <- unlist( # Extract `EGA` objects from rest
+      dynega_objects[!population_objects], recursive = FALSE
+    )
+      
+    # Put all objects together
+    dynega_list <- c(
+      dynega_population, dynega_other
+    )
+    
+    # Remove ".Ord*" labels
+    dynega_list <- lapply(dynega_list, function(x){
+      
+      # New names
+      new_names <- gsub(".Ord*.", "", dimnames(x$network)[[2]])
+      
+      # Change the network names
+      dimnames(x$network) <- list(new_names, new_names)
+      
+      # Change the membership names
+      names(x$wc) <- new_names
+      
+      # Return full result
+      return(x)
+      
+    })
+    
+  }else{ # Set up empty list
+    dynega_list <- list()
+  }
+  
+  # Compile all `EGA` objects
+  input.list <- c(ega_list, dynega_list)
+  
+  # Organize input list with base plot
+  if(is.character(base)){
+    base <- which(names(input.list) == base)
+  }
+  
+  # Re-assemble input list
+  input.list <- c(
+    input.list[base], input.list[-base]
+  )
+  
+  # Assign "labels"
+  if(!is.null(labels)){
+    names(input.list) <- labels
+  }
+  
+  # Set up as `dynEGA.Individual` object to
+  # leverage the code already implemented there
+  class(input.list) <- "dynEGA.Individual"
+  
+  # For `ellipse`, get legacy arguments
+  ellipse <- legacy_EGA_args(ellipse)
+  
+  # Get length of input list
+  input_length <- length(input.list)
+  
+  # Handle rows and columns
+  if(is.null(rows) & is.null(columns)){
+    
+    # Set rows first and then columns
+    rows <- floor(sqrt(input_length))
+    columns <- ceiling(input_length / rows)
+    # use `ceiling` since any non-zero 
+    # remainder means an extra column is necessary
+    
+  }else if(is.null(rows)){ # Set rows based on columns
+    rows <- ceiling(input_length / columns)
+  }else if(is.null(columns)){ # Set columns based on rows
+    columns <- ceiling(input_length / rows)
+  }
+  
+  # Add labels, rows, and columns
+  ellipse[c("nrow", "ncol")] <- list(rows, columns)
+  
+  # Plot using all "IDs"
+  return(
+    do.call(
+      what = plot,
+      args = c(
+        list(
+          x = input.list,
+          id = seq_len(input_length),
+          base = 1
+        ),
+        ellipse
       )
     )
-    
-    # Homogenize membership
-    homogenized.wc <- as.vector(homogenize.membership(target.wc, convert.wc))
-    
-    # Ensure names
-    names(homogenized.wc) <- names(target.wc)
-    
-    # Replace membership
-    if(is(comparison_EGA[[i]], "EGA")){
-      comparison_EGA[[i]]$wc <- homogenized.wc
-      names(comparison_EGA[[i]]$wc) <- colnames(comparison_EGA[[i]]$network)
-    }else if(is(comparison_EGA[[i]], "bootEGA")){
-      comparison_EGA[[i]]$typicalGraph$wc <- homogenized.wc
-    }else if(is(comparison_EGA[[i]], "dynEGA")){
-      comparison_EGA[[i]]$typicalGraph$wc <- homogenized.wc
-    }
-    
-    # Obtain number of communities
-    num_wc[i + 1] <- length(na.omit(unique(homogenized.wc)))
-  }
-  
-  # Reset object list
-  for(i in 1:length(object.list)){
-    
-    if(i == 1){
-      object.list[[1]] <- base_EGA
-    }else{
-      object.list[[i]] <- comparison_EGA[[i-1]]
-    }
-    
-  }
-  
-  # Re-organize plot list with reference to maximum communities
-  wc_ord <- order(num_wc, decreasing = TRUE)
-  object.list <- object.list[wc_ord]
-  
-  # Initialize plot list
-  plots_ega <- list()
-  plots_ega <- suppressPackageStartupMessages(
-    compare.plot.fix.EGA(
-      object.list,
-      plot.args = plot.args
-    )
   )
-  
-  # Get legend
-  shared_legend <- ggpubr::get_legend(plots_ega[[1]])
-  
-  # Reorder to original configuration
-  plots_ega <- plots_ega[order(wc_ord)]
-  
-  # Loop through matching 
-  for(i in 2:length(plots_ega)){
-    plots_ega[[i]] <- compare.EGA(plots_ega[[1]], plots_ega[[i]])[[2]]
-  }
-  
-  # Re-organize plot list with reference to base plot
-  set_number <- 1:length(plots_ega) # obtain number of plots
-  set_diff <- setdiff(set_number, base.plot) # remove base plot
-  set_org <- c(base.plot, set_diff) # get set organization
-  plots_ega <- plots_ega[set_org] # organize to original inputs
-  
-  # Set up grid return
-  compare.plot <- ggpubr::ggarrange(
-    plotlist = plots_ega, ncol = columns,
-    nrow = rows, labels = labels, label.x = 0.3,
-    legend.grob = shared_legend,
-    common.legend = TRUE, legend = "right"
-  )
-  
-  # Name plots
-  names(plots_ega) <- labels
-  
-  # Results
-  result <- list()
-  result$comparison.plot <- compare.plot
-  result$individual.plots <- plots_ega
-  
-  # Plot
-  plot(compare.plot)
-  
-  return(result)
-  
+
 }
+

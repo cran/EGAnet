@@ -40,7 +40,7 @@
 #' Values can range between 0 and 1
 #'
 #' @examples
-#' \dontrun{
+#' \donttest{
 #' # Dynamic EGA individual and population structures
 #' dyn1 <- dynEGA.ind.pop(
 #'   data = sim.dynEGA[,-26], n.embed = 5, tau = 1,
@@ -76,7 +76,8 @@
 #' Toward a psychology of individuals: The ergodicity information index and a bottom-up approach for finding generalizations.
 #' \emph{PsyArXiv}.
 #'
-#' @export
+#' @noRd
+#' 
 # JSD Ergodicity Test
 # Updated 22.08.2022
 jsd.ergoInfo <- function(
@@ -86,6 +87,12 @@ jsd.ergoInfo <- function(
     max.proportion = 0.10
 ){
   
+  # Send experimental message (for now)
+  experimental("jsd.ergoInfo")
+  
+  # Send not refactored warning (for now)
+  not_refactored("jsd.ergoInfo")
+
   # Check for method
   if(missing(method)){
     method <- "spectral"
@@ -181,7 +188,7 @@ jsd.ergoInfo <- function(
   
   # Set effect and interpretation
   ## Effect
-  effect <- ifelse(
+  effect <- swiftelse(
     proportion >= max.proportion,
     "nonergodic",
     "ergodic"
