@@ -2,8 +2,8 @@ Package: EGAnet
 Title: Exploratory Graph Analysis – a Framework for Estimating the
         Number of Dimensions in Multivariate Data using Network
         Psychometrics
-Version: 2.0.0
-Date: 2023-08-14
+Version: 2.0.1
+Date: 2023-08-22
 Authors@R: c(person("Hudson", "Golino", email = "hfg9s@virginia.edu", role = c("aut", "cre"), comment = c(ORCID = "0000-0002-1601-1447")),
 	     person("Alexander", "Christensen", email = "alexpaulchristensen@gmail.com", role = "aut", comment = c(ORCID = "0000-0002-9798-7037")),
 	     person("Robert", "Moulder", email = "rgm4fd@virginia.edu", role = "ctb", comment = c(ORCID = "0000-0001-7504-9560")),
@@ -36,7 +36,7 @@ URL: https://github.com/hfgolino/EGAnet
 BugReports: https://github.com/hfgolino/EGAnet/issues
 RoxygenNote: 7.2.3
 NeedsCompilation: yes
-Packaged: 2023-08-15 14:47:19 UTC; Hudson
+Packaged: 2023-08-22 13:24:36 UTC; Hudson
 Author: Hudson Golino [aut, cre] (<https://orcid.org/0000-0002-1601-1447>),
   Alexander Christensen [aut] (<https://orcid.org/0000-0002-9798-7037>),
   Robert Moulder [ctb] (<https://orcid.org/0000-0001-7504-9560>),
@@ -44,4 +44,4 @@ Author: Hudson Golino [aut, cre] (<https://orcid.org/0000-0002-1601-1447>),
   Laura Jamison [ctb] (<https://orcid.org/0000-0002-4656-8684>),
   Dingjing Shi [ctb] (<https://orcid.org/0000-0002-5652-3818>)
 Repository: CRAN
-Date/Publication: 2023-08-16 09:22:38 UTC
+Date/Publication: 2023-08-23 07:20:05 UTC

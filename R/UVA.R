@@ -141,7 +141,7 @@
 #' 
 #' @export
 # Unique Variable Analysis ----
-# Updated 08.08.2023
+# Updated 20.08.2023
 UVA <- function(
     data = NULL, network = NULL, n = NULL, key = NULL,
     uva.method = c("MBR", "EJP"),
@@ -194,7 +194,7 @@ UVA <- function(
   reduce.method <- set_default(reduce.method, "remove", UVA)
   
   # Get EGA output (regardless)
-  ega_output <- EGA(data, plot.EGA = FALSE, verbose = verbose, ...)
+  ega_output <- EGA(data, n = n, plot.EGA = FALSE, verbose = verbose, ...)
   
   # Get network
   if(!is.null(data) && is.null(network)){
@@ -374,7 +374,7 @@ UVA <- function(
 
 #' @noRd
 # Argument errors ----
-# Updated 13.08.2023
+# Updated 19.08.2023
 UVA_errors <- function(data, network, n, cut.off, reduce, auto, verbose)
 {
   
@@ -419,8 +419,8 @@ UVA_errors <- function(data, network, n, cut.off, reduce, auto, verbose)
   length_error(verbose, 1, "UVA")
   typeof_error(verbose, "logical", "UVA")
   
-  # Return data in case of tibble
-  return(data)
+  # Return usable data in case of tibble
+  return(usable_data(data, verbose))
   
 }
 

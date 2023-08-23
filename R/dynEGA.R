@@ -561,7 +561,7 @@ dynEGA <- function(
 
 #' @noRd
 # Errors ----
-# Updated 09.08.2023
+# Updated 19.08.2023
 dynEGA_errors <- function(
     data, id, group, n.embed, tau, delta,
     use.derivatives, ncores, verbose
@@ -623,7 +623,7 @@ dynEGA_errors <- function(
 
 #' @exportS3Method 
 # S3 Print Method (General) ----
-# Updated 09.08.2023
+# Updated 15.08.2023
 print.dynEGA <- function(x, ...)
 {
   
@@ -678,7 +678,7 @@ print.dynEGA <- function(x, ...)
   if(null_objects["group"]){
     
     # Check for breakspace
-    if(isFALSE(null_objects["population"])){
+    if(null_objects["population"]){
       cat(
         paste0(
           "\n\n",
