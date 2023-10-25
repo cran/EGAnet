@@ -15,12 +15,10 @@
 #' 
 #' \itemize{
 #' 
-#' \item{\code{"kld"} --- }
-#' {Uses Kullback-Leibler Divergence}
+#' \item \code{"kld"} --- Uses Kullback-Leibler Divergence
 #' 
-#' \item{\code{"spectral"} --- }
-#' {Uses eigenvalues of combinatiorial Laplacian matrix to compute
-#' Von Neumann entropy}
+#' \item \code{"spectral"} --- Uses eigenvalues of combinatorial Laplacian matrix to compute
+#' Von Neumann entropy
 #' 
 #' }
 #'
@@ -64,7 +62,7 @@
 #' @export
 #' 
 # Jensen-Shannon Distance
-# Updated 09.08.2023
+# Updated 24.10.2023
 jsd <- function(
     network1, network2,
     method = c("kld", "spectral")
@@ -163,9 +161,14 @@ rescaled_laplacian <- function(network)
 #' @noRd
 # Von Neumann Entropy ----
 # Called "entropy_laplacian" to avoid conflict with `vn.entropy`
-# Updated 10.07.2023
+# Updated 11.10.2023
 entropy_laplacian <- function(laplacian_matrix)
 {
+  
+  # Set NAs to zero
+  if(anyNA(laplacian_matrix)){
+    laplacian_matrix[is.na(laplacian_matrix)] <- 0
+  }
   
   # Get eigenvalues
   eigenvalues <- eigen(laplacian_matrix, symmetric = TRUE, only.values = TRUE)$values

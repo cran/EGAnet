@@ -46,7 +46,7 @@
 #' @export
 #' 
 # Information Theoretic Clustering for dynEGA
-# Updated 13.08.2023
+# Updated 22.10.2023
 infoCluster <- function(dynEGA.object, plot.cluster = TRUE)
 {
   
@@ -82,7 +82,7 @@ infoCluster <- function(dynEGA.object, plot.cluster = TRUE)
   
   # Get similarity matrix
   jss_matrix <- 1 - jsd_matrix
-
+  
   # Make diagonal 0 again
   diag(jss_matrix) <- diag(jsd_matrix) <- 0
   
@@ -116,48 +116,29 @@ infoCluster <- function(dynEGA.object, plot.cluster = TRUE)
 
   # Get modularities
   Qs <- nvapply(
-    cuts, function(cut_value){
-      modularity(jss_matrix, cutree(hier_clust, cut_value))
+    hier_cuts[cuts], function(cuts){
+      modularity(jss_matrix, cuts)
     }
   )
-    
-  # Maybe just use Walktrap?
-  # clusters <- remove_attributes(
-  #   community.detection(jss_matrix, algorithm = "walktrap")
-  # )
-  
-  # Possibility for Louvain with consensus?
-  # clusters <- remove_attributes(
-  #   community.consensus(jss_matrix)
-  # )
+
+  # Get largest change in the modularity index
+  Q_index <- which.max(Qs)
   
   # Obtain clusters
-  clusters <- cutree(hier_clust, cuts[which.max(Qs)])
+  clusters <- hier_cuts[[Q_index]] # cutree(hier_clust, cuts[Q_index])
   
   # Check if single cluster
   if(unique_length(clusters) == 1){
 
-    # Get number of nodes to initialize matrices
-    nodes <- dim(individual_networks[[1]])[2]
-    
-    # Get indices of upper triangle
-    upper_indices <- which(upper.tri(diag(nodes)))
+    # Get lower triangle
+    lower_triangle <- lower.tri(individual_networks[[1]])
     
     # Generate random networks
-    random_networks <- lapply(individual_networks, function(network){
-
-      # Initialize new matrix
-      new_network <- matrix(0, nrow = nodes, ncol = nodes)
-      
-      # Set shuffled indices up to edges to 1
-      new_network[
-        shuffle(upper_indices, size = edge_count(network))
-      ] <- 1
-      
-      # Make network symmetric
-      return(new_network + t(new_network))
-    
-    })
+    random_networks <- lapply(
+      individual_networks, rewire,
+      min = 0.05, max = 0.05, noise = NULL,
+      lower_triangle = lower_triangle
+    )
     
     # Get the random JSD matrix
     jsd_random_matrix <- pairwise_spectral_JSD(random_networks)
@@ -178,8 +159,8 @@ infoCluster <- function(dynEGA.object, plot.cluster = TRUE)
 
     # Compare to empirical
     comparison <- t.test(
-      jsd_matrix[upper_indices],
-      jsd_random_matrix[upper_indices],
+      jsd_matrix[lower_triangle],
+      jsd_random_matrix[lower_triangle],
       paired = TRUE,
       var.equal = FALSE
     )
@@ -190,14 +171,21 @@ infoCluster <- function(dynEGA.object, plot.cluster = TRUE)
     # Compute adaptive alpha
     adaptive_p <- adapt.a(
       test = "paired",
-      n = length(upper_indices),
+      n = length(lower_triangle),
       alpha = .001,
       power = 0.80,
-      efxize = "large"
+      efxize = "small"
+    )
+    
+    # Compute Cohen's d
+    cohens_d <- d(
+      jsd_matrix[lower_triangle],
+      jsd_random_matrix[lower_triangle],
+      paired = TRUE
     )
     
     # Check for empirical JSD > random JSD OR non-significant t-test
-    if(comparison_sign == 1 | comparison$p.value > adaptive_p$adapt.a){
+    if(comparison_sign == 1 | abs(cohens_d) < 0.20){
       
       # Set clusters to all individuals
       clusters <- cut_sequence
@@ -210,11 +198,7 @@ infoCluster <- function(dynEGA.object, plot.cluster = TRUE)
       JSD_random = jsd_random_matrix,
       t.test = comparison,
       adaptive.p.value = adaptive_p,
-      d = d(
-        jsd_matrix[upper_indices],
-        jsd_random_matrix[upper_indices],
-        paired = TRUE
-      )
+      d = cohens_d
     )
 
   }
@@ -222,7 +206,7 @@ infoCluster <- function(dynEGA.object, plot.cluster = TRUE)
   # Set up results
   results <- list(
     clusters = clusters,
-    modularity = Qs[which.max(Qs)],
+    modularity = Qs[Q_index],
     clusterTree = hier_clust,
     JSD = jsd_matrix
   )
@@ -280,7 +264,7 @@ summary.infoCluster <- function(object, ...)
 #' @exportS3Method 
 # S3 Plot Method ----
 # Works fast enough, so leaving as original code
-# Updated 13.07.2023
+# Updated 12.10.2023
 plot.infoCluster <- function(x, ...)
 {
   
@@ -304,51 +288,63 @@ plot.infoCluster <- function(x, ...)
   
   # Split dendrogram into upper grey section and lower coloured section
   cut <- unique_length(clusters)
-  height <- unique(cluster_data$segments$y)[order(unique(cluster_data$segments$y), decreasing = TRUE)]
-  cut.height <- mean(c(height[cut], height[cut-1]))
-  cluster_data$segments$line <- swiftelse(cluster_data$segments$y == cluster_data$segments$yend &
-                                         cluster_data$segments$y > cut.height, 1, 2)
-  cluster_data$segments$line <- swiftelse(cluster_data$segments$yend  > cut.height, 1, cluster_data$segments$line)
   
-  # Number the clusters
-  cluster_data$segments$cluster <- c(-1, diff(cluster_data$segments$line))
-  change <- which(cluster_data$segments$cluster == 1)
-  for (i in 1:cut) cluster_data$segments$cluster[change[i]] = i + 1
-  cluster_data$segments$cluster <-  swiftelse(cluster_data$segments$line == 1, 1, 
-                                           swiftelse(cluster_data$segments$cluster == 0, NA, cluster_data$segments$cluster))
-  
-  
-  # Replace NA values in cluster
-  if(!all(is.na(cluster_data$segments$cluster))){
-    for(i in seq_along(cluster_data$segments$cluster)){
-      
-      if(is.na(cluster_data$segments$cluster[i])){
-        cluster_data$segments$cluster[i] <- cluster_data$segments$cluster[i-1]
+  # Check for maximum clusters (i.e., no clusters)
+  if(cut != length(clusters)){
+    
+    unique_y_segments <- unique(cluster_data$segments$y)
+    height <- unique_y_segments[order(unique_y_segments, decreasing = TRUE)]
+    cut.height <- mean(c(height[cut], height[cut-1]))
+    cluster_data$segments$line <- swiftelse(cluster_data$segments$y == cluster_data$segments$yend &
+                                              cluster_data$segments$y > cut.height, 1, 2)
+    cluster_data$segments$line <- swiftelse(cluster_data$segments$yend  > cut.height, 1, cluster_data$segments$line)
+    
+    # Number the clusters
+    cluster_data$segments$cluster <- c(-1, diff(cluster_data$segments$line))
+    change <- which(cluster_data$segments$cluster == 1)
+    for (i in 1:cut) cluster_data$segments$cluster[change[i]] = i + 1
+    cluster_data$segments$cluster <-  swiftelse(cluster_data$segments$line == 1, 1, 
+                                                swiftelse(cluster_data$segments$cluster == 0, NA, cluster_data$segments$cluster))
+    
+    
+    # Replace NA values in cluster
+    if(!all(is.na(cluster_data$segments$cluster))){
+      for(i in seq_along(cluster_data$segments$cluster)){
+        
+        if(is.na(cluster_data$segments$cluster[i])){
+          cluster_data$segments$cluster[i] <- cluster_data$segments$cluster[i-1]
+        }
+        
       }
-      
+    }else{
+      cluster_data$segments$cluster <- -1
     }
+    
+    
+    # Consistent numbering between segment$cluster and label$cluster
+    cluster_df$label <- factor(cluster_df$label, levels = cluster_data$labels$label)
+    cluster_df$cluster <- factor((cluster_df$cluster), levels = unique(cluster_df$cluster), labels = (1:cut) + 1)
+    cluster_data[["labels"]] <- merge(cluster_data[["labels"]], cluster_df, by = "label")
+    
+    # Positions for cluster labels
+    n.rle <- rle(cluster_data$segments$cluster)
+    N <- cumsum(n.rle$lengths)
+    N <- N[seq(1, length(N), 2)] + 1
+    N.df <- cluster_data$segments[N, ]
+    N.df$cluster <- N.df$cluster - 1
+    
+    # Check for all the same cluster
+    if(all(cluster_data$segments$cluster == -1)){
+      cluster_data$segments$cluster <- rep(
+        1, length(cluster_data$segments$cluster)
+      )
+    }
+    
   }else{
-    cluster_data$segments$cluster <- -1
-  }
-  
-  
-  # Consistent numbering between segment$cluster and label$cluster
-  cluster_df$label <- factor(cluster_df$label, levels = cluster_data$labels$label)
-  cluster_df$cluster <- factor((cluster_df$cluster), levels = unique(cluster_df$cluster), labels = (1:cut) + 1)
-  cluster_data[["labels"]] <- merge(cluster_data[["labels"]], cluster_df, by = "label")
-  
-  # Positions for cluster labels
-  n.rle <- rle(cluster_data$segments$cluster)
-  N <- cumsum(n.rle$lengths)
-  N <- N[seq(1, length(N), 2)] + 1
-  N.df <- cluster_data$segments[N, ]
-  N.df$cluster <- N.df$cluster - 1
-  
-  # Check for all the same cluster
-  if(all(cluster_data$segments$cluster == -1)){
-    cluster_data$segments$cluster <- rep(
-      1, length(cluster_data$segments$cluster)
-    )
+    
+    # Set clusters to 1
+    cluster_data$segments$cluster <- 1
+    
   }
   
   # Ensure clusters are factors
@@ -374,14 +370,6 @@ plot.infoCluster <- function(x, ...)
       ggplot2::aes(x, y, label = label, hjust = 0),
       size = 3
     ) +
-    ggplot2::geom_text(
-      data = N.df,
-      ggplot2::aes(
-        x = x, y = y, label = factor(cluster),
-        colour = factor(cluster + 1)
-      ),
-      hjust = 1.5, show.legend = FALSE
-    ) +
     ggplot2::scale_color_manual(
       labels = label,
       values = c(
@@ -405,6 +393,22 @@ plot.infoCluster <- function(x, ...)
     ggplot2::guides(
       color = ggplot2::guide_legend(title = "Cluster")
     )
+  
+  # Check whether "N.df" exists
+  if(exists("N.df")){
+    
+    cluster_plot <- cluster_plot +
+      ggplot2::geom_text(
+        data = N.df,
+        ggplot2::aes(
+          x = x, y = y, label = factor(cluster),
+          colour = factor(cluster + 1)
+        ),
+        hjust = 1.5, show.legend = FALSE
+      )
+    
+  }
+  
   
   # Remove clusters if none
   if(all(clusters == ncol_sequence(x$JSD))){

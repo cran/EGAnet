@@ -443,7 +443,7 @@ reproducible_bootstrap <- function(
 
 #' @noRd
 # Get available memory ----
-# Updated 22.07.2023
+# Updated 18.10.2023
 available_memory <- function()
 {
 
@@ -452,36 +452,11 @@ available_memory <- function()
 
   # Branch based on OS
   if(OS == "windows"){ # Windows
-
-    # # System information
-    # system_info <- system("systeminfo", intern = TRUE)
-    # 
-    # # Get available memory
-    # value <- system_info[
-    #   grep("Available Physical Memory", system_info)
-    # ]
-    # 
-    # # Remove extraneous information
-    # value <- gsub("Available Physical Memory: ", "", value)
-    # value <- gsub("\\,", "", value)
-    # 
-    # # Convert to bytes
-    # value_split <- unlist(strsplit(value, split = " "))
-    # 
-    # # Check for second value
-    # bytes <- as.numeric(value_split[1]) * switch(
-    #   value_split[2],
-    #   "B"  = 1, # edge case
-    #   "KB" = 1e+03,
-    #   "MB" = 1e+06,
-    #   "GB" = 1e+09,
-    #   "TB" = 1e+12 # edge case
-    # )
     
     # Alternative (outputs memory in kB)
     bytes <- as.numeric(
       trimws(system("wmic OS get FreePhysicalMemory", intern = TRUE))[2]
-    ) * 1000
+    ) * 1e+03
 
   }else if(OS == "linux"){ # Linux
     
@@ -498,8 +473,8 @@ available_memory <- function()
     # Bind values
     info_split <- do.call(rbind, info_split[1:2])
     
-    # Get free values (Linux reports in bytes)
-    bytes <- as.numeric(info_split[2, info_split[1,] == "free"])
+    # Get free values (Linux reports in *kilo*bytes -- thanks, Aleksandar Tomasevic)
+    bytes <- as.numeric(info_split[2, info_split[1,] == "available"]) * 1e+03
     
   }else{ # Mac
     
@@ -556,7 +531,7 @@ restore_state <- function()
 
 #' @noRd
 # Wrapper for parallelization ----
-# Updated 10.08.2023
+# Updated 24.10.2023
 parallel_process <- function(
     iterations, # number of iterations
     datalist = NULL, # list of data
@@ -570,30 +545,38 @@ parallel_process <- function(
 ){
   
   # Get available memory
-  memory_available <- available_memory()
-  
-  # Check for global environment size
-  if(isTRUE(export)){ # needs `isTRUE` in case of character vector
-    global_memory_usage <- sum(nvapply(ls(),function(x){object.size(get(x))}))
-  }else{
-    global_memory_usage <- sum(nvapply(ls()[ls() %in% export],function(x){object.size(get(x))}))
+  memory_available <- try(
+    available_memory(),
+    silent = TRUE
+  )
+
+  # In case the memory check fails
+  if(!is(memory_available, "try-error")){
+    
+    # Check for global environment size
+    if(export){ # needs `isTRUE` in case of character vector
+      global_memory_usage <- sum(nvapply(ls(),function(x){object.size(get(x))}))
+    }else{
+      global_memory_usage <- sum(nvapply(ls()[ls() %in% export],function(x){object.size(get(x))}))
+    }
+    
+    # Check for memory overload
+    if(memory_available < global_memory_usage * ncores){
+      stop(
+        paste0(
+          "Available memory (", byte_digits(memory_available), ") is less than ",
+          "the amount of memory needed to perform parallelization: ",
+          byte_digits(global_memory_usage * ncores), ".\n\n",
+          "Lower the number of cores (`ncores`) or perform ",
+          "batches of your operation."
+        ), call. = FALSE
+      )
+    }
+    
+    # Set max size
+    options(future.globals.maxSize = memory_available)
+    
   }
-  
-  # Check for memory overload
-  if(memory_available < global_memory_usage * ncores){
-    stop(
-      paste0(
-        "Available memory (", byte_digits(memory_available), ") is less than ",
-        "the amount of memory needed to perform parallelization: ",
-        byte_digits(global_memory_usage * ncores), ".\n\n",
-        "Lower the number of cores (`ncores`) or perform ",
-        "batches of your operation."
-      ), call. = FALSE
-    )
-  }
-  
-  # Set max size
-  options(future.globals.maxSize = memory_available)
   
   # Set up plan
   future::plan(
@@ -1119,10 +1102,10 @@ unique_length <- function(x)
 # Edge count ----
 # Counts the number of edges
 # (assumes network is _symmetric_ matrix)
-# Updated 24.07.2023
+# Updated 11.10.2023
 edge_count <- function(network, nodes, diagonal = FALSE)
 {
-  return((sum(network != 0) - swiftelse(diagonal, nodes, 0)) * 0.50)
+  return((sum(network != 0, na.rm = TRUE) - swiftelse(diagonal, nodes, 0)) * 0.50)
 }
 
 #' @noRd
@@ -1426,9 +1409,17 @@ obtain_networks <- function(network, signed)
 }
 
 #' @noRd
+# Whether usable data is needed ----
+# Updated 07.09.2023
+needs_usable <- function(ellipse)
+{
+  return(!"needs_usable" %in% names(ellipse) || ellipse$needs_usable)
+}
+
+#' @noRd
 # Obtain data, sample size, correlation matrix ----
 # Generic function to get the usual needed inputs
-# Updated 24.07.2023
+# Updated 04.09.2023
 obtain_sample_correlations <- function(data, n, corr, na.data, verbose, ...)
 {
   
@@ -1449,23 +1440,38 @@ obtain_sample_correlations <- function(data, n, corr, na.data, verbose, ...)
     
   }else{
     
-    # Check for appropriate variables
-    data <- usable_data(data, verbose)
+    # Check for usable data
+    if(needs_usable(list(...))){
+      data <- usable_data(data, verbose)
+    }
     
     # Obtain sample size
     n <- dim(data)[1]
     
     # Check for automatic correlations
     if(corr == "auto"){
-      
-      # Compute correlations
       correlation_matrix <- auto.correlate(
-        data = data, corr = "pearson",
-        na.data = na.data, verbose = verbose,
-        ...
+        data = data, corr = "pearson", na.data = na.data, 
+        verbose = verbose, ...
+      )
+    }else if(corr == "cor_auto"){
+      
+      # Get arguments for `cor_auto`
+      cor_auto_ARGS <- obtain_arguments(
+        FUN = qgraph::cor_auto,
+        FUN.args = list(...)
       )
       
-    }else{ # Obtain correlations using base R
+      # Set 'data' and 'verbose' arguments
+      cor_auto_ARGS[c("data", "verbose")] <- list(data, verbose)
+      
+      # Obtain correlations
+      correlation_matrix <- do.call(
+        what = qgraph::cor_auto,
+        args = cor_auto_ARGS
+      )
+      
+    }else{
       correlation_matrix <- cor(data, use = na.data, method = corr)
     }
     
@@ -2436,7 +2442,7 @@ dimension_comparison <- function(original, comparison){
 
 #' @noRd
 # Basic set up for comparing plots ----
-# Updated 07.07.2023
+# Updated 28.09.2023
 compare_plots <- function(comparison_network, comparison_wc, plot_ARGS)
 {
   
@@ -2469,10 +2475,23 @@ compare_plots <- function(comparison_network, comparison_wc, plot_ARGS)
   
   # Remove some arguments from `plot_ARGS`
   ## Essentially, the same call but allows some freedom
-  plot_ARGS[c(
-    "net", "node.color", "edge.alpha",
-    "edge.color", "edge.lty", "edge.size"
-  )] <- NULL
+  plot_ARGS[c("net", "node.color")] <- NULL
+  
+  ## Check for "edge" stuff
+  edge_stuff <- c(
+    "edge.alpha", "edge.color", 
+    "edge.lty", "edge.size"
+  )
+  
+  ## Check for lengths of "edge" stuff
+  edge_lengths <- edge_stuff[
+    nvapply(plot_ARGS[edge_stuff], length) > 1
+  ]
+  
+  ## Get edges arguments
+  if(length(edge_lengths) != 0){
+    plot_ARGS[edge_lengths] <- NULL
+  }
   
   # Send on and return from `basic_plot_setup`
   return(do.call(basic_plot_setup, plot_ARGS))
@@ -2513,7 +2532,7 @@ not_refactored <- function(function_name)
 
 #' @noRd
 # Error for class ----
-# Updated 13.08.2023
+# Updated 04.09.2023
 class_error <- function(input, expected_class, function_name){
   
   # Check for object types
@@ -2522,8 +2541,10 @@ class_error <- function(input, expected_class, function_name){
       h = stop,
       msg = paste0(
         "Input into '", deparse(substitute(input)),
-        "' is not the expected class ", paste0("'", expected_class, "'", collapse = ", "),
-        ". Input is class ", paste0("'", class(input), "'", collapse = ", ")
+        "' is an object with ", paste0("'", class(input), "'", collapse = ", "), " class(es)",
+        ". Input is expected to be ", paste0("'", expected_class, "'", collapse = ", "), " class(es)",
+        "\n\n For more details on how to fix this error, see:\n",
+        "https://r-ega.net/articles/errors.html#class-error"
       ), 
       call = function_name
     )
@@ -2533,7 +2554,7 @@ class_error <- function(input, expected_class, function_name){
 
 #' @noRd
 # Error for object type ----
-# Updated 13.08.2023
+# Updated 04.09.2023
 object_error <- function(input, expected_type, function_name){
   
   # Get input type
@@ -2545,8 +2566,10 @@ object_error <- function(input, expected_type, function_name){
       h = stop,
       msg = paste0(
         "Input into '", deparse(substitute(input)),
-        "' argument is not ", paste0("'", expected_type, "'", collapse = ", "),
-        ". Input is ", paste0("'", input_type, "'", collapse = ", ")
+        "' is a ", paste0("'", input_type, "'", collapse = ", "), " object",
+        ". Input is expected to be ", paste0("'", expected_type, "'", collapse = ", "), " object",
+        "\n\n For more details on how to fix this error, see:\n",
+        "https://r-ega.net/articles/errors.html#object-error"
       ), 
       call = function_name
     )
@@ -2556,7 +2579,7 @@ object_error <- function(input, expected_type, function_name){
 
 #' @noRd
 # Error for `typeof` ----
-# Updated 13.08.2023
+# Updated 04.09.2023
 typeof_error <- function(input, expected_value, function_name){
   
   # Switch out "closure" with "function"
@@ -2590,9 +2613,11 @@ typeof_error <- function(input, expected_value, function_name){
       h = stop,
       msg = paste0(
         "Input into '", deparse(substitute(input)),
-        "' is ", paste("'", typeof_input, "'", sep = "", collapse = ", "),
+        "' is ", paste("'", typeof_input, "'", sep = "", collapse = ", "), " type",
         ". Input is expected to be ",
-        paste0("'", expected_value, "'", collapse = " or ")
+        paste0("'", expected_value, "'", collapse = " or "), " type",
+        "\n\n For more details on how to fix this error, see:\n",
+        "https://r-ega.net/articles/errors.html#typeof-error"
         # can use "or" because `typeof` won't ever be more than two
       ), 
       call = function_name
@@ -2603,7 +2628,7 @@ typeof_error <- function(input, expected_value, function_name){
 
 #' @noRd
 # Error for `length` ----
-# Updated 13.08.2023
+# Updated 04.09.2023
 length_error <- function(input, expected_lengths, function_name){
   
   # Check for length of input in expected length
@@ -2613,7 +2638,9 @@ length_error <- function(input, expected_lengths, function_name){
       msg = paste0(
         "Length of '", deparse(substitute(input)),
         "' (", length(input),") does not match expected length(s). Length must be: ",
-        paste0("'", expected_lengths, "'", collapse = " or ")
+        paste0("'", expected_lengths, "'", collapse = " or "),
+        "\n\n For more details on how to fix this error, see:\n",
+        "https://r-ega.net/articles/errors.html#length-error"
       ), 
       call = function_name
     )
@@ -2623,7 +2650,7 @@ length_error <- function(input, expected_lengths, function_name){
 
 #' @noRd
 # Error for `range` ----
-# Updated 13.08.2023
+# Updated 04.09.2023
 range_error <- function(input, expected_ranges, function_name){
   
   # Obtain expected maximum and minimum values
@@ -2639,9 +2666,11 @@ range_error <- function(input, expected_ranges, function_name){
     .handleSimpleError(
       h = stop,
       msg = paste0(
-        "Maximum of '", deparse(substitute(input)),
-        "' (", actual_maximum,") does not match expected range(s). Range must be between: ",
-        paste0("'", expected_ranges, "'", collapse = " and ")
+        "Maximum value of '", deparse(substitute(input)),
+        "' (", actual_maximum,") does not match expected range(s). Values must range between: ",
+        paste0("'", expected_ranges, "'", collapse = " and "),
+        "\n\n For more details on how to fix this error, see:\n",
+        "https://r-ega.net/articles/errors.html#range-error"
       ), 
       call = function_name
     )
@@ -2652,9 +2681,11 @@ range_error <- function(input, expected_ranges, function_name){
     .handleSimpleError(
       h = stop,
       msg = paste0(
-        "Minimum of '", deparse(substitute(input)),
-        "' (", actual_minimum,") does not match expected range(s). Range must be between: ",
-        paste0("'", expected_ranges, "'", collapse = " and ")
+        "Minimum value of '", deparse(substitute(input)),
+        "' (", actual_minimum,") does not match expected range(s). Values must range between: ",
+        paste0("'", expected_ranges, "'", collapse = " and "),
+        "\n\n For more details on how to fix this error, see:\n",
+        "https://r-ega.net/articles/errors.html#range-error"
       ), 
       call = function_name
     )
@@ -2708,6 +2739,73 @@ pcor2inv <- function(partial_correlations)
   
   # Return inverse covariance matrix
   return(solve(-partial_correlations))
+  
+}
+
+#%%%%%%%%%%%%%%%%%%%%%%%%
+## NETWORK FUNCTIONS ----
+#%%%%%%%%%%%%%%%%%%%%%%%%
+
+#' @noRd
+# Rewire networks ----
+# About 10x faster than previous implementation
+# Updated 30.07.2023
+rewire <- function(
+    network, min = 0.20, max = 0.40,
+    noise = 0.10, lower_triangle
+)
+{
+  
+  # Work only with the lower triangle
+  lower_network <- network[lower_triangle]
+  
+  # Get non-zero edges
+  non_zero_edges <- which(lower_network != 0)
+  
+  # Number of edges
+  edges <- length(non_zero_edges)
+  
+  # Add noise
+  if(!is.null(noise)){
+    
+    # Only add to existing edges
+    lower_network[non_zero_edges] <- 
+      lower_network[non_zero_edges] + runif(edges, -noise, noise)
+    
+  }
+  
+  # Number of edges to rewire
+  rewire_edges <- floor(edges * runif(1, min, max))
+  
+  # Get rewiring indices
+  rewire_index <- shuffle(non_zero_edges, size = rewire_edges)
+  
+  # Get replacement indices
+  replace_index <- shuffle(seq_along(lower_network), size = rewire_edges)
+  
+  # Make a copy of the lower network
+  lower_network_original <- lower_network
+  
+  # Replace values
+  lower_network[rewire_index] <- lower_network_original[replace_index]
+  lower_network[replace_index] <- lower_network_original[rewire_index]
+  
+  # Get nodes in original network
+  nodes <- dim(network)[2]
+  
+  # Initialize a new network
+  new_network <- matrix(
+    0, nrow = nodes, ncol = nodes,
+    dimnames = dimnames(network)
+  )
+  
+  # Replace values
+  new_network[lower_triangle] <- lower_network
+  new_network <- t(new_network)
+  new_network[lower_triangle] <- lower_network
+  
+  # Return the rewired network
+  return(new_network)
   
 }
 

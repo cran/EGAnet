@@ -19,21 +19,21 @@
 #' 
 #' \itemize{
 #' 
-#' \item{\code{"auto"} --- }
-#' {Automatically computes appropriate correlations for
+#' \item \code{"auto"} --- Automatically computes appropriate correlations for
 #' the data using Pearson's for continuous, polychoric for ordinal,
 #' tetrachoric for binary, and polyserial/biserial for ordinal/binary with
 #' continuous. To change the number of categories that are considered
 #' ordinal, use \code{ordinal.categories}
-#' (see \code{\link[EGAnet]{polychoric.matrix}} for more details)}
+#' (see \code{\link[EGAnet]{polychoric.matrix}} for more details)
 #' 
-#' \item{\code{"pearson"} --- }
-#' {Pearson's correlation is computed for all variables regardless of
-#' categories}
+#' \item \code{"cor_auto"} --- Uses \code{\link[qgraph]{cor_auto}} to compute correlations. 
+#' Arguments can be passed along to the function
 #' 
-#' \item{\code{"spearman"} --- }
-#' {Spearman's rank-order correlation is computed for all variables
-#' regardless of categories}
+#' \item \code{"pearson"} --- Pearson's correlation is computed for all 
+#' variables regardless of categories
+#' 
+#' \item \code{"spearman"} --- Spearman's rank-order correlation is computed 
+#' for all variables regardless of categories
 #' 
 #' }
 #' 
@@ -47,12 +47,10 @@
 #' 
 #' \itemize{
 #' 
-#' \item{\code{"pairwise"} --- }
-#' {Computes correlation for all available cases between
-#' two variables}
+#' \item \code{"pairwise"} --- Computes correlation for all available cases between
+#' two variables
 #' 
-#' \item{\code{"listwise"} --- }
-#' {Computes correlation for all complete cases in the dataset}
+#' \item \code{"listwise"} --- Computes correlation for all complete cases in the dataset
 #' 
 #' }
 #' 
@@ -62,19 +60,16 @@
 #' 
 #' \itemize{
 #' 
-#' \item{\code{"BGGM"} --- }
-#' {Computes the Bayesian Gaussian Graphical Model.
+#' \item \code{"BGGM"} --- Computes the Bayesian Gaussian Graphical Model.
 #' Set argument \code{ordinal.categories} to determine
 #' levels allowed for a variable to be considered ordinal.
-#' See \code{\link[BGGM]{estimate}} for more details}
+#' See \code{?BGGM::estimate} for more details
 #' 
-#' \item{\code{"glasso"} --- }
-#' {Computes the GLASSO with EBIC model selection.
-#' See \code{\link[EGAnet]{EBICglasso.qgraph}} for more details}
+#' \item \code{"glasso"} --- Computes the GLASSO with EBIC model selection.
+#' See \code{\link[EGAnet]{EBICglasso.qgraph}} for more details
 #' 
-#' \item{\code{"TMFG"} --- }
-#' {Computes the TMFG method.
-#' See \code{\link[EGAnet]{TMFG}} for more details}
+#' \item \code{"TMFG"} --- Computes the TMFG method.
+#' See \code{\link[EGAnet]{TMFG}} for more details
 #' 
 #' }
 #' 
@@ -86,18 +81,15 @@
 #' 
 #' \itemize{
 #'
-#' \item{\code{"leiden"} --- }
-#' {See \code{\link[igraph]{cluster_leiden}} for more details}
+#' \item \code{"leiden"} --- See \code{\link[igraph]{cluster_leiden}} for more details
 #' 
-#' \item{\code{"louvain"} --- }
-#' {By default, \code{"louvain"} will implement the Louvain algorithm using 
+#' \item \code{"louvain"} --- By default, \code{"louvain"} will implement the Louvain algorithm using 
 #' the consensus clustering method (see \code{\link[EGAnet]{community.consensus}} 
 #' for more information). This function will implement
 #' \code{consensus.method = "most_common"} and \code{consensus.iter = 1000} 
-#' unless specified otherwise}
+#' unless specified otherwise
 #' 
-#' \item{\code{"walktrap"} --- }
-#' {See \code{\link[igraph]{cluster_walktrap}} for more details}
+#' \item \code{"walktrap"} --- See \code{\link[igraph]{cluster_walktrap}} for more details
 #' 
 #' }
 #' 
@@ -139,12 +131,6 @@
 #' # Estimate EGA with TMFG
 #' ega.wmt.tmfg <- EGA.estimate(data = wmt, model = "TMFG")
 #' 
-#' # Estimate Bayesian EGA (BEGA)
-#' bega.wmt <- EGA.estimate(
-#'   data = wmt, model = "BGGM",
-#'   analytic = TRUE # faster example for CRAN
-#' )
-#' 
 #' # Estimate EGA with an {igraph} function (Fast-greedy)
 #' ega.wmt.greedy <- EGA.estimate(
 #'   data = wmt,
@@ -173,10 +159,10 @@
 #' @export
 #'
 # Estimates multidimensional EGA only (no automatic plots)
-# Updated 09.08.2023
+# Updated 24.10.2023
 EGA.estimate <- function(
     data, n = NULL,
-    corr = c("auto", "pearson", "spearman"),
+    corr = c("auto", "cor_auto", "pearson", "spearman"),
     na.data = c("pairwise", "listwise"),
     model = c("BGGM", "glasso", "TMFG"),  
     algorithm = c("leiden", "louvain", "walktrap"),
@@ -185,17 +171,16 @@ EGA.estimate <- function(
 {
   
   # Check for missing arguments (argument, default, function)
-  corr <- set_default(corr, "auto", c("auto", "cor_auto", "pearson", "spearman"))
-  corr <- swiftelse(corr == "cor_auto", "auto", corr) # deprecate `cor_auto`
+  corr <- set_default(corr, "auto", EGA.estimate)
   na.data <- set_default(na.data, "pairwise", auto.correlate)
   model <- set_default(model, "glasso", network.estimation)
   algorithm <- set_default(algorithm, "walktrap", community.detection)
 
   # Argument errors (return data in case of tibble)
-  data <- EGA.estimate_errors(data, n, verbose)
+  data <- EGA.estimate_errors(data, n, verbose, ...)
   
   # Obtain ellipse arguments
-  ellipse <- list(...)
+  ellipse <- list(needs_usable = FALSE, ...)
   
   # Handle legacy arguments (`model.args` and `algorithm.args`)
   ellipse <- legacy_EGA_args(ellipse)
@@ -207,7 +192,8 @@ EGA.estimate <- function(
   output <- obtain_sample_correlations(
     data = data, n = n, 
     corr = corr, na.data = na.data, 
-    verbose = verbose, ...
+    verbose = verbose, needs_usable = FALSE, # skips usable data check
+    ...
   )
   
   # Get outputs
@@ -232,7 +218,8 @@ EGA.estimate <- function(
     # Set up network estimation arguments
     estimation_ARGS <- list(
       n = n, corr = corr, na.data = na.data,
-      model = model, network.only = TRUE, verbose = verbose
+      model = model, network.only = TRUE,
+      verbose = verbose
     )
     
     # Check for BGGM
@@ -331,8 +318,8 @@ EGA.estimate <- function(
 
 #' @noRd
 # Errors ----
-# Updated 19.08.2023
-EGA.estimate_errors <- function(data, n, verbose)
+# Updated 07.09.2023
+EGA.estimate_errors <- function(data, n, verbose, ...)
 {
   
   # 'data' errors
@@ -353,8 +340,13 @@ EGA.estimate_errors <- function(data, n, verbose)
   length_error(verbose, 1, "EGA.estimate")
   typeof_error(verbose, "logical", "EGA.estimate")
   
+  # Check for usable data
+  if(needs_usable(list(...))){
+    data <- usable_data(data, verbose)
+  }
+  
   # Return data (in case of tibble)
-  return(usable_data(data, verbose))
+  return(data)
   
 }
 

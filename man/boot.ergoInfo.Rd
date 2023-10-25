@@ -7,7 +7,7 @@
 boot.ergoInfo(
   dynEGA.object,
   EII,
-  use = c("edge.list", "unweighted"),
+  use = c("edge.list", "unweighted", "weighted"),
   iter = 100,
   ncores,
   verbose = TRUE
@@ -32,12 +32,12 @@ Current options are:
 
 \itemize{
 
-\item{\code{"edge.list"} --- }
-{Calculates the algorithm complexity using the list of edges.}
+\item \code{"edge.list"} --- Calculates the algorithm complexity using the list of edges
 
-\item{\code{"unweighted"} --- }
-{Calculates the algorithm complexity using the binary weights of the network.
-0 = edge absent and 1 = edge present}
+\item \code{"unweighted"} --- Calculates the algorithm complexity using the binary weights of the network.
+0 = edge absent and 1 = edge present
+
+\item \code{"weighted"} --- Calculates the algorithm complexity using the weights of encoded prime-weight transformed network
 
 }}
 

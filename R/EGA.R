@@ -21,21 +21,21 @@
 #' 
 #' \itemize{
 #' 
-#' \item{\code{"auto"} --- }
-#' {Automatically computes appropriate correlations for
+#' \item \code{"auto"} --- Automatically computes appropriate correlations for
 #' the data using Pearson's for continuous, polychoric for ordinal,
 #' tetrachoric for binary, and polyserial/biserial for ordinal/binary with
 #' continuous. To change the number of categories that are considered
 #' ordinal, use \code{ordinal.categories}
-#' (see \code{\link[EGAnet]{polychoric.matrix}} for more details)}
+#' (see \code{\link[EGAnet]{polychoric.matrix}} for more details)
 #' 
-#' \item{\code{"pearson"} --- }
-#' {Pearson's correlation is computed for all variables regardless of
-#' categories}
+#' \item \code{"cor_auto"} --- Uses \code{\link[qgraph]{cor_auto}} to compute correlations. 
+#' Arguments can be passed along to the function
 #' 
-#' \item{\code{"spearman"} --- }
-#' {Spearman's rank-order correlation is computed for all variables
-#' regardless of categories}
+#' \item \code{"pearson"} --- Pearson's correlation is computed for all 
+#' variables regardless of categories
+#' 
+#' \item \code{"spearman"} --- Spearman's rank-order correlation is computed 
+#' for all variables regardless of categories
 #' 
 #' }
 #' 
@@ -49,12 +49,10 @@
 #' 
 #' \itemize{
 #' 
-#' \item{\code{"pairwise"} --- }
-#' {Computes correlation for all available cases between
-#' two variables}
+#' \item \code{"pairwise"} --- Computes correlation for all available cases between
+#' two variables
 #' 
-#' \item{\code{"listwise"} --- }
-#' {Computes correlation for all complete cases in the dataset}
+#' \item \code{"listwise"} --- Computes correlation for all complete cases in the dataset
 #' 
 #' }
 #' 
@@ -64,19 +62,16 @@
 #' 
 #' \itemize{
 #' 
-#' \item{\code{"BGGM"} --- }
-#' {Computes the Bayesian Gaussian Graphical Model.
+#' \item \code{"BGGM"} --- Computes the Bayesian Gaussian Graphical Model.
 #' Set argument \code{ordinal.categories} to determine
 #' levels allowed for a variable to be considered ordinal.
-#' See \code{\link[BGGM]{estimate}} for more details}
+#' See \code{?BGGM::estimate} for more details
 #' 
-#' \item{\code{"glasso"} --- }
-#' {Computes the GLASSO with EBIC model selection.
-#' See \code{\link[EGAnet]{EBICglasso.qgraph}} for more details}
+#' \item \code{"glasso"} --- Computes the GLASSO with EBIC model selection.
+#' See \code{\link[EGAnet]{EBICglasso.qgraph}} for more details
 #' 
-#' \item{\code{"TMFG"} --- }
-#' {Computes the TMFG method.
-#' See \code{\link[EGAnet]{TMFG}} for more details}
+#' \item \code{"TMFG"} --- Computes the TMFG method.
+#' See \code{\link[EGAnet]{TMFG}} for more details
 #' 
 #' }
 #' 
@@ -88,18 +83,15 @@
 #' 
 #' \itemize{
 #'
-#' \item{\code{"leiden"} --- }
-#' {See \code{\link[igraph]{cluster_leiden}} for more details}
+#' \item \code{"leiden"} --- See \code{\link[igraph]{cluster_leiden}} for more details
 #' 
-#' \item{\code{"louvain"} --- }
-#' {By default, \code{"louvain"} will implement the Louvain algorithm using 
+#' \item \code{"louvain"} --- By default, \code{"louvain"} will implement the Louvain algorithm using 
 #' the consensus clustering method (see \code{\link[EGAnet]{community.consensus}} 
 #' for more information). This function will implement
 #' \code{consensus.method = "most_common"} and \code{consensus.iter = 1000} 
-#' unless specified otherwise}
+#' unless specified otherwise
 #' 
-#' \item{\code{"walktrap"} --- }
-#' {See \code{\link[igraph]{cluster_walktrap}} for more details}
+#' \item \code{"walktrap"} --- See \code{\link[igraph]{cluster_walktrap}} for more details
 #' 
 #' }
 #'
@@ -110,28 +102,25 @@
 #' 
 #' \itemize{
 #'
-#' \item{\code{"expand"} --- }
-#' {Expands the correlation matrix with four variables correlated 0.50.
+#' \item \code{"expand"} --- Expands the correlation matrix with four variables correlated 0.50.
 #' If number of dimension returns 2 or less in check, then the data 
 #' are unidimensional; otherwise, regular EGA with no matrix
 #' expansion is used. This method was used in the Golino et al.'s (2020)
-#' \emph{Psychological Methods} simulation}
+#' \emph{Psychological Methods} simulation
 #'
-#' \item{\code{"LE"} --- }
-#' {Applies the Leading Eigenvector algorithm
+#' \item \code{"LE"} --- Applies the Leading Eigenvector algorithm
 #' (\code{\link[igraph]{cluster_leading_eigen}})
 #' on the empirical correlation matrix. If the number of dimensions is 1,
 #' then the Leading Eigenvector solution is used; otherwise, regular EGA
 #' is used. This method was used in the Christensen et al.'s (2023) 
-#' \emph{Behavior Research Methods} simulation}
+#' \emph{Behavior Research Methods} simulation
 #' 
-#' \item{\code{"louvain"} --- }
-#' {Applies the Louvain algorithm (\code{\link[igraph]{cluster_louvain}})
+#' \item \code{"louvain"} --- Applies the Louvain algorithm (\code{\link[igraph]{cluster_louvain}})
 #' on the empirical correlation matrix. If the number of dimensions is 1, 
 #' then the Louvain solution is used; otherwise, regular EGA is used. 
 #' This method was validated Christensen's (2022) \emph{PsyArXiv} simulation.
 #' Consensus clustering can be used by specifying either
-#' \code{"consensus.method"} or \code{"consensus.iter"}}
+#' \code{"consensus.method"} or \code{"consensus.iter"}
 #' 
 #' }
 #'
@@ -238,10 +227,10 @@
 #'
 #' @export
 # EGA ----
-# Updated 09.08.2023
+# Updated 24.10.2023
 EGA <- function (
     data, n = NULL,
-    corr = c("auto", "pearson", "spearman"),
+    corr = c("auto", "cor_auto", "pearson", "spearman"),
     na.data = c("pairwise", "listwise"),
     model = c("BGGM", "glasso", "TMFG"),  
     algorithm = c("leiden", "louvain", "walktrap"),
@@ -254,15 +243,14 @@ EGA <- function (
   # Check for missing arguments (argument, default, function)
   # Uses actual function they will be used in
   # (keeping non-function choices for `cor_auto`)
-  corr <- set_default(corr, "auto", c("auto", "cor_auto", "pearson", "spearman"))
-  corr <- swiftelse(corr == "cor_auto", "auto", corr) # deprecate `cor_auto`
+  corr <- set_default(corr, "auto", EGA)
   na.data <- set_default(na.data, "pairwise", auto.correlate)
   model <- set_default(model, "glasso", network.estimation)
   algorithm <- set_default(algorithm, "walktrap", community.detection)
-  uni.method <- set_default(uni.method, "louvain", community.unidimensional)
+  uni.method <- set_default(uni.method, "louvain", EGA)
   
   # Argument errors (return data in case of tibble)
-  data <- EGA_errors(data, n, plot.EGA, verbose)
+  data <- EGA_errors(data, n, plot.EGA, verbose, ...)
   
   # Ensure data has names
   data <- ensure_dimension_names(data)
@@ -273,7 +261,8 @@ EGA <- function (
   multidimensional_result <- EGA.estimate(
     data = data, n = n, corr = corr, na.data = na.data,
     model = model, algorithm = algorithm,
-    verbose = verbose, ...
+    verbose = verbose, needs_usable = FALSE, # skips usable data check
+    ...
   )
   
   # Store model attributes
@@ -286,17 +275,22 @@ EGA <- function (
   ## is an S3method. It's possible to use
   ## `BGGM:::select.estimate` but CRAN gets
   ## mad about triple colons
-  bggm_select_ARGS <- list( # defaults for `BGGM:::select.estimate`
-    cred = 0.95, alternative = "two.sided"
-  )
+  # bggm_select_ARGS <- list( # defaults for `BGGM:::select.estimate`
+  #   cred = 0.95, alternative = "two.sided"
+  # )
+  
+  # Check for {BGGM}
+  if(model == "bggm"){
+    stop("Due to CRAN check issues, `model = \"BGGM\"` is not available at the moment.")
+  }
   
   # Obtain arguments for model
   model_ARGS <- switch(
     model_attributes$model,
-    "bggm" = c(
-      obtain_arguments(BGGM::estimate, model_attributes),
-      overwrite_arguments(bggm_select_ARGS, model_attributes)
-    ),
+    # "bggm" = c(
+    #   obtain_arguments(BGGM::estimate, model_attributes),
+    #   overwrite_arguments(bggm_select_ARGS, model_attributes)
+    # ),
     "glasso" = obtain_arguments(EBICglasso.qgraph, model_attributes),
     "tmfg" = obtain_arguments(TMFG, model_attributes)
   )
@@ -308,7 +302,7 @@ EGA <- function (
   unidimensional_ARGS <- list( # standard arguments
     data = data, n = n, corr = corr, na.data = na.data,
     model = model, uni.method = uni.method,
-    verbose = verbose
+    verbose = verbose, needs_usable = FALSE # skips usable data check
   )
   
   # `data` at this point will be data or correlation matrix
@@ -384,12 +378,12 @@ EGA <- function (
   if(plot.EGA && sum(multidimensional_result$network != 0)){
     
     # Set up plot
-    multidimensional_result$Plot.EGA <- plot(
+    multidimensional_result$plot.EGA <- plot(
       multidimensional_result, ...
     )
     
     # Actually send the plot
-    silent_plot(multidimensional_result$Plot.EGA)
+    silent_plot(multidimensional_result$plot.EGA)
     
   }
 
@@ -406,8 +400,8 @@ EGA <- function (
 
 #' @noRd
 # Errors ----
-# Updated 19.08.2023
-EGA_errors <- function(data, n, plot.EGA, verbose)
+# Updated 07.09.2023
+EGA_errors <- function(data, n, plot.EGA, verbose, ...)
 {
   
   # 'data' errors
@@ -432,8 +426,13 @@ EGA_errors <- function(data, n, plot.EGA, verbose)
   length_error(verbose, 1, "EGA")
   typeof_error(verbose, "logical", "EGA")
   
+  # Check for usable data
+  if(needs_usable(list(...))){
+    data <- usable_data(data, verbose)
+  }
+  
   # Return data in case of tibble
-  return(usable_data(data, verbose))
+  return(data)
   
 }
 

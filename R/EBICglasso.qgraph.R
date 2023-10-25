@@ -12,6 +12,46 @@
 #'
 #' @param n Numeric (length = 1).
 #' Sample size if \code{data} provided is a correlation matrix
+#' 
+#' @param corr Character (length = 1).
+#' Method to compute correlations.
+#' Defaults to \code{"auto"}.
+#' Available options:
+#' 
+#' \itemize{
+#' 
+#' \item \code{"auto"} --- Automatically computes appropriate correlations for
+#' the data using Pearson's for continuous, polychoric for ordinal,
+#' tetrachoric for binary, and polyserial/biserial for ordinal/binary with
+#' continuous. To change the number of categories that are considered
+#' ordinal, use \code{ordinal.categories}
+#' (see \code{\link[EGAnet]{polychoric.matrix}} for more details)
+#' 
+#' \item \code{"cor_auto"} --- Uses \code{\link[qgraph]{cor_auto}} to 
+#' compute correlations. Arguments can be passed along to the function
+#' 
+#' \item \code{"pearson"} --- Pearson's correlation is computed for 
+#' all variables regardless of categories
+#' 
+#' \item \code{"spearman"} --- Spearman's rank-order correlation is 
+#' computed for all variables regardless of categories
+#' 
+#' }
+#' 
+#' @param na.data Character (length = 1).
+#' How should missing data be handled?
+#' Defaults to \code{"pairwise"}.
+#' Available options:
+#' 
+#' \itemize{
+#' 
+#' \item \code{"pairwise"} --- Computes correlation for all available 
+#' cases between two variables
+#' 
+#' \item \code{"listwise"} --- Computes correlation for all complete 
+#' cases in the dataset
+#'
+#' }
 #'
 #' @param gamma Numeric (length = 1)
 #' EBIC tuning parameter.
@@ -105,10 +145,12 @@
 #' @export
 #'
 # Computes optimal glasso network based on EBIC ----
-# Updated 09.08.2023
+# Updated 24.10.2023
 EBICglasso.qgraph <- function(
     data, # Sample covariance matrix
     n = NULL,
+    corr = c("auto", "cor_auto", "pearson", "spearman"),
+    na.data = c("pairwise", "listwise"),
     gamma = 0.5,
     penalize.diagonal = FALSE, # Penalize diagonal?
     nlambda = 100,
@@ -123,13 +165,16 @@ EBICglasso.qgraph <- function(
 )
 {
   
-  # Determine model selection
+  # Check for missing arguments (argument, default, function)
+  corr <- set_default(corr, "auto", EBICglasso.qgraph)
+  na.data <- set_default(na.data, "pairwise", auto.correlate)
   model.selection <- set_default(model.selection, "ebic", EBICglasso.qgraph)
   
   # Argument errors (return data in case of tibble)
   data <- EBICglasso.qgraph_errors(
     data, n, gamma, penalize.diagonal, nlambda,
-    returnAllResults, countDiagonal, refit, verbose
+    returnAllResults, countDiagonal, refit,
+    verbose, ...
   )
   
   # Obtain dimensions
@@ -141,8 +186,10 @@ EBICglasso.qgraph <- function(
   
   # Generic function to get necessary inputs
   output <- obtain_sample_correlations(
-    data = data, n = n, corr = "auto", 
-    na.data = "pairwise", verbose = verbose, ...
+    data = data, n = n, corr = corr, 
+    na.data = na.data, verbose = verbose, 
+    needs_usable = FALSE, # skips usable data check
+    ...
   )
   
   # Get correlations and sample size
@@ -164,7 +211,25 @@ EBICglasso.qgraph <- function(
   
   # Perform GLASSO path
   if(missing(penalizeMatrix)){
-    glas_path <- glasso::glassopath(S, lambda, trace = 0, penalize.diagonal = penalize.diagonal, ...)
+    
+    # Get arguments
+    glasso_ARGS <- obtain_arguments(
+      FUN = glasso::glassopath,
+      FUN.args = c(
+        list(
+          s = S, rholist = lambda, trace = 0, 
+          penalize.diagonal = penalize.diagonal
+        ),
+        list(...)
+      )
+    )
+    
+    # Call `glassopath`
+    glas_path <- do.call(
+      what = glasso::glassopath,
+      args = glasso_ARGS
+    )
+    
   }else{
     
     # Set up array dimensions
@@ -179,9 +244,29 @@ EBICglasso.qgraph <- function(
     
     # Loop over lambdas
     for (i in lambda_sequence){
-      res <- glasso::glasso(S, penalizeMatrix * lambda[i], trace = 0, penalize.diagonal = penalize.diagonal, ...)
+      
+      # Get arguments
+      glasso_ARGS <- obtain_arguments(
+        FUN = glasso::glasso,
+        FUN.args = c(
+          list(
+            s = S, rho = penalizeMatrix * lambda[i], trace = 0, 
+            penalize.diagonal = penalize.diagonal
+          ),
+          list(...)
+        )
+      )
+      
+      # Get result
+      res <- do.call(
+        what = glasso::glasso,
+        args = glasso_ARGS
+      )
+      
+      # Populate covariance arrays
       glas_path$w[,,i] <- res$w
       glas_path$wi[,,i] <- res$wi
+      
     }
     
   }
@@ -307,10 +392,11 @@ EBICglasso.qgraph <- function(
 
 #' @noRd
 # Errors ----
-# Updated 19.08.2023
+# Updated 07.09.2023
 EBICglasso.qgraph_errors <- function(
     data, n, gamma, penalize.diagonal, nlambda,
-    returnAllResults, countDiagonal, refit, verbose
+    returnAllResults, countDiagonal, refit,
+    verbose, ...
 )
 {
 
@@ -358,8 +444,13 @@ EBICglasso.qgraph_errors <- function(
   length_error(verbose, 1, "EBICglasso.qgraph")
   typeof_error(verbose, "logical", "EBICglasso.qgraph")
   
+  # Check for usable data
+  if(needs_usable(list(...))){
+    data <- usable_data(data, verbose)
+  }
+  
   # Return usable data in case of tibble
-  return(usable_data(data, verbose))
+  return(data)
   
 }
 

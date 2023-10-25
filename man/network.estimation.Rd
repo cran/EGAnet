@@ -7,7 +7,7 @@
 network.estimation(
   data,
   n = NULL,
-  corr = c("auto", "pearson", "spearman"),
+  corr = c("auto", "cor_auto", "pearson", "spearman"),
   na.data = c("pairwise", "listwise"),
   model = c("BGGM", "glasso", "TMFG"),
   network.only = TRUE,
@@ -29,21 +29,21 @@ Available options:
 
 \itemize{
 
-\item{\code{"auto"} --- }
-{Automatically computes appropriate correlations for
+\item \code{"auto"} --- Automatically computes appropriate correlations for
 the data using Pearson's for continuous, polychoric for ordinal,
 tetrachoric for binary, and polyserial/biserial for ordinal/binary with
 continuous. To change the number of categories that are considered
 ordinal, use \code{ordinal.categories}
-(see \code{\link[EGAnet]{polychoric.matrix}} for more details)}
+(see \code{\link[EGAnet]{polychoric.matrix}} for more details)
 
-\item{\code{"pearson"} --- }
-{Pearson's correlation is computed for all variables regardless of
-categories}
+\item \code{"cor_auto"} --- Uses \code{\link[qgraph]{cor_auto}} to compute correlations. 
+Arguments can be passed along to the function
 
-\item{\code{"spearman"} --- }
-{Spearman's rank-order correlation is computed for all variables
-regardless of categories}
+\item \code{"pearson"} --- Pearson's correlation is computed for all 
+variables regardless of categories
+
+\item \code{"spearman"} --- Spearman's rank-order correlation is computed 
+for all variables regardless of categories
 
 }
 
@@ -57,12 +57,10 @@ Available options:
 
 \itemize{
 
-\item{\code{"pairwise"} --- }
-{Computes correlation for all available cases between
-two variables}
+\item \code{"pairwise"} --- Computes correlation for all available cases between
+two variables
 
-\item{\code{"listwise"} --- }
-{Computes correlation for all complete cases in the dataset}
+\item \code{"listwise"} --- Computes correlation for all complete cases in the dataset
 
 }}
 
@@ -72,19 +70,16 @@ Available options:
 
 \itemize{
 
-\item{\code{"BGGM"} --- }
-{Computes the Bayesian Gaussian Graphical Model.
+\item \code{"BGGM"} --- Computes the Bayesian Gaussian Graphical Model.
 Set argument \code{ordinal.categories} to determine
 levels allowed for a variable to be considered ordinal.
-See \code{\link[BGGM]{estimate}} for more details}
+See \code{?BGGM::estimate} for more details
 
-\item{\code{"glasso"} --- }
-{Computes the GLASSO with EBIC model selection.
-See \code{\link[EGAnet]{EBICglasso.qgraph}} for more details}
+\item \code{"glasso"} --- Computes the GLASSO with EBIC model selection.
+See \code{\link[EGAnet]{EBICglasso.qgraph}} for more details
 
-\item{\code{"TMFG"} --- }
-{Computes the TMFG method.
-See \code{\link[EGAnet]{TMFG}} for more details}
+\item \code{"TMFG"} --- Computes the TMFG method.
+See \code{\link[EGAnet]{TMFG}} for more details
 
 }}
 
@@ -117,12 +112,6 @@ wmt <- wmt2[,7:24]
 # EBICglasso (default for EGA functions)
 glasso_network <- network.estimation(
   data = wmt, model = "glasso"
-)
-
-# BGGM with analytic solution
-bggm_network <- network.estimation(
-  data = wmt, model = "BGGM",
-  analytic = TRUE # faster example for CRAN
 )
 
 # TMFG

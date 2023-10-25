@@ -13,7 +13,9 @@
 #' 
 #' @param structure Numeric or character vector (length = \code{ncol(data)}).
 #' A vector representing the structure (numbers or labels for each item).
-#' Can be theoretical factors or the structure detected by \code{\link[EGAnet]{EGA}}
+#' Can be theoretical factors or the structure detected by \code{\link[EGAnet]{EGA}}.
+#' If supplied, then configural invariance check is skipped (i.e., configural
+#' invariance is assumed based on the given structure)
 #' 
 #' @param iter Numeric (length = 1).
 #' Number of iterations to perform for the permutation.
@@ -36,21 +38,21 @@
 #' 
 #' \itemize{
 #' 
-#' \item{\code{"auto"} --- }
-#' {Automatically computes appropriate correlations for
+#' \item \code{"auto"} --- Automatically computes appropriate correlations for
 #' the data using Pearson's for continuous, polychoric for ordinal,
 #' tetrachoric for binary, and polyserial/biserial for ordinal/binary with
 #' continuous. To change the number of categories that are considered
 #' ordinal, use \code{ordinal.categories}
-#' (see \code{\link[EGAnet]{polychoric.matrix}} for more details)}
+#' (see \code{\link[EGAnet]{polychoric.matrix}} for more details)
 #' 
-#' \item{\code{"pearson"} --- }
-#' {Pearson's correlation is computed for all variables regardless of
-#' categories}
+#' \item \code{"cor_auto"} --- Uses \code{\link[qgraph]{cor_auto}} to compute correlations. 
+#' Arguments can be passed along to the function
 #' 
-#' \item{\code{"spearman"} --- }
-#' {Spearman's rank-order correlation is computed for all variables
-#' regardless of categories}
+#' \item \code{"pearson"} --- Pearson's correlation is computed for all 
+#' variables regardless of categories
+#' 
+#' \item \code{"spearman"} --- Spearman's rank-order correlation is computed 
+#' for all variables regardless of categories
 #' 
 #' }
 #' 
@@ -64,12 +66,10 @@
 #' 
 #' \itemize{
 #' 
-#' \item{\code{"pairwise"} --- }
-#' {Computes correlation for all available cases between
-#' two variables}
+#' \item \code{"pairwise"} --- Computes correlation for all available cases between
+#' two variables
 #' 
-#' \item{\code{"listwise"} --- }
-#' {Computes correlation for all complete cases in the dataset}
+#' \item \code{"listwise"} --- Computes correlation for all complete cases in the dataset
 #' 
 #' }
 #' 
@@ -79,19 +79,16 @@
 #' 
 #' \itemize{
 #' 
-#' \item{\code{"BGGM"} --- }
-#' {Computes the Bayesian Gaussian Graphical Model.
+#' \item \code{"BGGM"} --- Computes the Bayesian Gaussian Graphical Model.
 #' Set argument \code{ordinal.categories} to determine
 #' levels allowed for a variable to be considered ordinal.
-#' See \code{\link[BGGM]{estimate}} for more details}
+#' See \code{?BGGM::estimate} for more details
 #' 
-#' \item{\code{"glasso"} --- }
-#' {Computes the GLASSO with EBIC model selection.
-#' See \code{\link[EGAnet]{EBICglasso.qgraph}} for more details}
+#' \item \code{"glasso"} --- Computes the GLASSO with EBIC model selection.
+#' See \code{\link[EGAnet]{EBICglasso.qgraph}} for more details
 #' 
-#' \item{\code{"TMFG"} --- }
-#' {Computes the TMFG method.
-#' See \code{\link[EGAnet]{TMFG}} for more details}
+#' \item \code{"TMFG"} --- Computes the TMFG method.
+#' See \code{\link[EGAnet]{TMFG}} for more details
 #' 
 #' }
 #' 
@@ -103,18 +100,15 @@
 #' 
 #' \itemize{
 #'
-#' \item{\code{"leiden"} --- }
-#' {See \code{\link[igraph]{cluster_leiden}} for more details}
+#' \item \code{"leiden"} --- See \code{\link[igraph]{cluster_leiden}} for more details
 #' 
-#' \item{\code{"louvain"} --- }
-#' {By default, \code{"louvain"} will implement the Louvain algorithm using 
+#' \item \code{"louvain"} --- By default, \code{"louvain"} will implement the Louvain algorithm using 
 #' the consensus clustering method (see \code{\link[EGAnet]{community.consensus}} 
 #' for more information). This function will implement
 #' \code{consensus.method = "most_common"} and \code{consensus.iter = 1000} 
-#' unless specified otherwise}
+#' unless specified otherwise
 #' 
-#' \item{\code{"walktrap"} --- }
-#' {See \code{\link[igraph]{cluster_walktrap}} for more details}
+#' \item \code{"walktrap"} --- See \code{\link[igraph]{cluster_walktrap}} for more details
 #' 
 #' }
 #'
@@ -125,28 +119,25 @@
 #' 
 #' \itemize{
 #'
-#' \item{\code{"expand"} --- }
-#' {Expands the correlation matrix with four variables correlated 0.50.
+#' \item \code{"expand"} --- Expands the correlation matrix with four variables correlated 0.50.
 #' If number of dimension returns 2 or less in check, then the data 
 #' are unidimensional; otherwise, regular EGA with no matrix
 #' expansion is used. This method was used in the Golino et al.'s (2020)
-#' \emph{Psychological Methods} simulation}
+#' \emph{Psychological Methods} simulation
 #'
-#' \item{\code{"LE"} --- }
-#' {Applies the Leading Eigenvector algorithm
+#' \item \code{"LE"} --- Applies the Leading Eigenvector algorithm
 #' (\code{\link[igraph]{cluster_leading_eigen}})
 #' on the empirical correlation matrix. If the number of dimensions is 1,
 #' then the Leading Eigenvector solution is used; otherwise, regular EGA
 #' is used. This method was used in the Christensen et al.'s (2023) 
-#' \emph{Behavior Research Methods} simulation}
+#' \emph{Behavior Research Methods} simulation
 #' 
-#' \item{\code{"louvain"} --- }
-#' {Applies the Louvain algorithm (\code{\link[igraph]{cluster_louvain}})
+#' \item \code{"louvain"} --- Applies the Louvain algorithm (\code{\link[igraph]{cluster_louvain}})
 #' on the empirical correlation matrix. If the number of dimensions is 1, 
 #' then the Louvain solution is used; otherwise, regular EGA is used. 
 #' This method was validated Christensen's (2022) \emph{PsyArXiv} simulation.
 #' Consensus clustering can be used by specifying either
-#' \code{"consensus.method"} or \code{"consensus.iter"}}
+#' \code{"consensus.method"} or \code{"consensus.iter"}
 #' 
 #' }
 #' 
@@ -242,14 +233,11 @@
 #' 
 #' \itemize{
 #' 
-#' \item{\code{\link[EGAnet]{EGA}} --- }
-#' {\code{\link[EGAnet]{EGA}} results for each group}
+#' \item \code{\link[EGAnet]{EGA}} --- \code{\link[EGAnet]{EGA}} results for each group
 #' 
-#' \item{\code{loadings} --- }
-#' {Network loadings (\code{\link[EGAnet]{net.loads}}) for each group}
+#' \item \code{loadings} --- Network loadings (\code{\link[EGAnet]{net.loads}}) for each group
 #' 
-#' \item{\code{loadingsDifference} --- }
-#' {Difference between the dominant loadings of each group}
+#' \item \code{loadingsDifference} --- Difference between the dominant loadings of each group
 #' 
 #' }
 #' 
@@ -259,14 +247,11 @@
 #' 
 #' \itemize{
 #' 
-#' \item{\code{groups} --- }
-#' {Permutated groups acorss iterations}
+#' \item \code{groups} --- Permutated groups acorss iterations
 #' 
-#' \item{\code{loadings} --- }
-#' {Network loadings (\code{\link[EGAnet]{net.loads}}) for each group for each permutation}
+#' \item \code{loadings} --- Network loadings (\code{\link[EGAnet]{net.loads}}) for each group for each permutation
 #' 
-#' \item{\code{loadingsDifference} --- }
-#' {Difference between the dominant loadings of each group for each permutation}
+#' \item \code{loadingsDifference} --- Difference between the dominant loadings of each group for each permutation
 #' 
 #' }
 #' 
@@ -306,12 +291,14 @@
 #' @export
 #'
 # Measurement Invariance
-# Updated 13.08.2023
+# Updated 24.10.2023
 invariance <- function(
+    # `invariance` arguments
     data, groups, structure = NULL,
     iter = 500, configural.threshold = 0.70,
     configural.type = c("parametric", "resampling"),
-    corr = c("auto", "pearson", "spearman"),
+    # standard arguments
+    corr = c("auto", "cor_auto", "pearson", "spearman"),
     na.data = c("pairwise", "listwise"),
     model = c("BGGM", "glasso", "TMFG"),  
     algorithm = c("leiden", "louvain", "walktrap"),
@@ -326,8 +313,7 @@ invariance <- function(
   
   # Check for missing arguments (argument, default, function)
   configural.type <- set_default(configural.type, "parametric", invariance)
-  corr <- set_default(corr, "auto", c("auto", "cor_auto", "pearson", "spearman"))
-  corr <- swiftelse(corr == "cor_auto", "auto", corr) # deprecate `cor_auto`
+  corr <- set_default(corr, "auto", invariance)
   na.data <- set_default(na.data, "pairwise", auto.correlate)
   model <- set_default(model, "glasso", network.estimation)
   algorithm <- set_default(algorithm, "walktrap", community.detection)
@@ -392,51 +378,51 @@ invariance <- function(
     
   }
   
-  # Send message
-  message("Testing configural invariance...")
-  
-  # Perform configural invariance
-  configural_results <- configural(
-    data = data, iter = iter, structure = structure,
-    configural.threshold = configural.threshold,
-    configural.type = configural.type, corr = corr,
-    na.data = na.data, model = model, algorithm = algorithm,
-    uni.method = uni.method, ncores = ncores, seed = seed,
-    verbose = verbose, ...
-  )
-  
-  # Check for configural invariance
-  if(!configural_results$configural_flag){
+  # If structure is supplied, then skip configural invariance
+  if(is.null(structure)){
     
     # Send message
-    message("\nConfigural invariance was not found. Terminating invariance testing...")
+    message("Testing configural invariance...")
     
-    # Return configural invariance results
-    return(configural_results)
+    # Perform configural invariance
+    configural_results <- configural(
+      data = data, iter = iter, structure = structure,
+      configural.threshold = configural.threshold,
+      configural.type = configural.type, corr = corr,
+      na.data = na.data, model = model, algorithm = algorithm,
+      uni.method = uni.method, ncores = ncores, seed = seed,
+      verbose = verbose, ...
+    )
     
-  }
-  
-  # Configural invariance was found, continue with metric
-  
-  # Send message
-  message(paste(
-    "\nConfigural invariance was found with", 
-    length(configural_results$stable_items), "variables", 
-    "\n\nTesting metric invariance..."
-  ))
-
-  # Update data
-  data <- configural_results$data
-  
-  # Update dimensions and dimension names of the data
-  dimensions <- dim(data)
-  dimension_names <- dimnames(data)
-  
-  # Update original EGA
-  original_EGA <- configural_results$boot_object$EGA
-  
-  # Send error if 'structure' is not a vector, matrix, or data frame
-  if(!is.null(structure)){
+    # Check for configural invariance
+    if(!configural_results$configural_flag){
+      
+      # Send message
+      message("\nConfigural invariance was not found. Terminating invariance testing...")
+      
+      # Return configural invariance results
+      return(configural_results)
+      
+    }
+    
+    # Configural invariance was found, continue with metric
+    
+    # Send message
+    message(paste(
+      "\nConfigural invariance was found with", 
+      length(configural_results$stable_items), "variables\n"
+    ))
+    
+    # Update data
+    data <- configural_results$data
+    
+    # Update original EGA
+    original_EGA <- configural_results$boot_object$EGA
+    
+    # Set structure based on original `EGA`
+    structure <- original_EGA$wc
+    
+  }else{
     
     # Remove attributes
     structure <- remove_attributes(structure)
@@ -450,12 +436,14 @@ invariance <- function(
     # Make sure 'structure' has names
     names(structure) <- original_dimension_names[[2]]
     
-    # Reduce based on stable items
-    structure <- structure[names(configural_results$stable_items)]
-    
-  }else{ # Set structure based on original `EGA`
-    structure <- original_EGA$wc
   }
+  
+  # Send message about continuing on with metric invariance
+  message("Testing metric invariance...")
+  
+  # Update dimensions and dimension names of the data
+  dimensions <- dim(data)
+  dimension_names <- dimnames(data)
 
   # Get community names
   community_names <- as.character(unique(structure))
@@ -485,7 +473,7 @@ invariance <- function(
     )
     
     # Reorder and return loadings
-    return(loadings[dimension_names[[2]], community_names])
+    return(loadings[dimension_names[[2]], community_names, drop = FALSE])
     
   })
   
@@ -556,8 +544,8 @@ invariance <- function(
   
   # Compute differences (ensure same ordering)
   difference_list <- lapply(permutated_loadings, function(x){
-    x[[1]][dimension_names[[2]], community_names] -
-      x[[2]][dimension_names[[2]], community_names]
+    x[[1]][dimension_names[[2]], community_names, drop = FALSE] -
+      x[[2]][dimension_names[[2]], community_names, drop = FALSE]
   })
   
   # Obtain assigned loadings only
@@ -615,9 +603,17 @@ invariance <- function(
   
   # Results list
   results <- list(
-    configural.results = configural_results,
+    configural.results = swiftelse(
+      exists("configural_results"),
+      configural_results,
+      NULL
+    ),
     memberships = structure,
-    EGA = original_EGA,
+    EGA = swiftelse(
+      exists("original_EGA"),
+      original_EGA,
+      NULL
+    ),
     groups = list(
       EGA = group_ega,
       loadings = group_loadings,
@@ -791,7 +787,7 @@ group_setup <- function(
 
 #' @exportS3Method 
 # S3 Plot Method ----
-# Updated 13.08.2023
+# Updated 08.10.2023
 plot.invariance <- function(x, p_type = c("p", "p_BH"), p_value = 0.05, ...)
 {
   
@@ -802,11 +798,11 @@ plot.invariance <- function(x, p_type = c("p", "p_BH"), p_value = 0.05, ...)
   range_error(p_value, c(0, 1), "plot.invariance")
   
   # Ensure same memberships
-  x$groups$EGA[[1]]$wc <- x$EGA$wc
-  x$groups$EGA[[2]]$wc <- x$EGA$wc
+  x$groups$EGA[[1]]$wc <- x$memberships
+  x$groups$EGA[[2]]$wc <- x$memberships
   
   # Obtain noninvariant items
-  noninvariant <- x$results[names(x$EGA$wc), p_type] <= p_value
+  noninvariant <- x$results[names(x$memberships), p_type] <= p_value
   
   # Get number of nodes
   nodes <- length(noninvariant)

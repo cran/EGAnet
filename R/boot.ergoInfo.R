@@ -22,12 +22,12 @@
 #'
 #' \itemize{
 #'
-#' \item{\code{"edge.list"} --- }
-#' {Calculates the algorithm complexity using the list of edges.}
+#' \item \code{"edge.list"} --- Calculates the algorithm complexity using the list of edges
 #'
-#' \item{\code{"unweighted"} --- }
-#' {Calculates the algorithm complexity using the binary weights of the network.
-#' 0 = edge absent and 1 = edge present}
+#' \item \code{"unweighted"} --- Calculates the algorithm complexity using the binary weights of the network.
+#' 0 = edge absent and 1 = edge present
+#' 
+#' \item \code{"weighted"} --- Calculates the algorithm complexity using the weights of encoded prime-weight transformed network
 #' 
 #' }
 #'
@@ -141,10 +141,10 @@
 #'
 #' @export
 # Bootstrap Test for the Ergodicity Information Index
-# Updated 03.08.2023
+# Updated 24.10.2023
 boot.ergoInfo <- function(
     dynEGA.object, EII, 
-    use = c("edge.list", "unweighted"),
+    use = c("edge.list", "unweighted", "weighted"),
     iter = 100, ncores, verbose = TRUE
 ){
   
@@ -251,6 +251,9 @@ boot.ergoInfo <- function(
     )
   )
   
+  # Add "methods" attribute
+  attr(results, "methods") <- list(use = use)
+  
   # Set class
   class(results) <- "boot.ergoInfo"
   
@@ -288,16 +291,64 @@ boot.ergoInfo_errors <- function(dynEGA.object, iter, ncores, verbose)
 
 #' @exportS3Method 
 # S3 Print Method ----
-# Updated 26.07.2023
+# Updated 19.10.2023
 print.boot.ergoInfo <- function(x, ...)
 {
   
-  # Message about print support
-  message("No print support yet")
+  # Print lower order
+  cat(
+    styletext(
+      text = styletext(
+        text =  "Empirical EII\n\n", 
+        defaults = "underline"
+      ),
+      defaults = "bold"
+    )
+  )
   
-  # Print x
-  x
+  # Print EII method
+  cat(
+    "EII Method: ",
+    switch(
+      attr(x, "methods")$use,
+      "edge.list" = "Edge List",
+      "unweighted" = "Unweighted",
+      "weighted" = "Weighted"
+    ), "\n"
+  )
   
+  # Print EII value
+  cat("EII: ", round(x$empirical.ergoInfo, 4))
+  
+  # Add breakspace
+  cat("\n\n")
+  
+  # Print higher order
+  cat(
+    styletext(
+      text = styletext(
+        text =  "Bootstrap EII\n\n", 
+        defaults = "underline"
+      ),
+      defaults = "bold"
+    )
+  )
+  
+  # Print descriptives
+  cat(
+    paste0(
+      "Mean = ", round(mean(x$boot.ergoInfo, na.rm = TRUE), 4),
+      " (SD = ", round(sd(x$boot.ergoInfo, na.rm = TRUE), 4), ")",
+      "\np-value = ", round(x$p.value, 4), " (", x$effect, ")",
+      "\nErgodic: ", swiftelse(x$effect == "greater", "No", "Yes")
+    )
+  )
+  
+  cat("\n\n")
+  
+  # Print interpretation
+  cat("Interpretation:\n", x$interpretation)
+
 }
 
 #' @exportS3Method 
@@ -327,69 +378,6 @@ plot.boot.ergoInfo <- function(x, ...)
         xintercept = x$empirical.ergoInfo, color = "#00AFBB", linetype = "dotted" 
       )
   )
-  
-}
-
-#' @noRd
-# Rewire networks ----
-# About 10x faster than previous implementation
-# Updated 30.07.2023
-rewire <- function(
-    network, min = 0.20, max = 0.40,
-    noise = 0.10, lower_triangle
-)
-{
-  
-  # Work only with the lower triangle
-  lower_network <- network[lower_triangle]
-  
-  # Get non-zero edges
-  non_zero_edges <- which(lower_network != 0)
-  
-  # Number of edges
-  edges <- length(non_zero_edges)
-  
-  # Add noise
-  if(!is.null(noise)){
-    
-    # Only add to existing edges
-    lower_network[non_zero_edges] <- 
-      lower_network[non_zero_edges] + runif(edges, -noise, noise)
-    
-  }
-  
-  # Number of edges to rewire
-  rewire_edges <- floor(edges * runif(1, min, max))
-  
-  # Get rewiring indices
-  rewire_index <- shuffle(non_zero_edges, size = rewire_edges)
- 
-  # Get replacement indices
-  replace_index <- shuffle(seq_along(lower_network), size = rewire_edges)
- 
-  # Make a copy of the lower network
-  lower_network_original <- lower_network
-  
-  # Replace values
-  lower_network[rewire_index] <- lower_network_original[replace_index]
-  lower_network[replace_index] <- lower_network_original[rewire_index]
-  
-  # Get nodes in original network
-  nodes <- dim(network)[2]
-  
-  # Initialize a new network
-  new_network <- matrix(
-    0, nrow = nodes, ncol = nodes,
-    dimnames = dimnames(network)
-  )
-  
-  # Replace values
-  new_network[lower_triangle] <- lower_network
-  new_network <- t(new_network)
-  new_network[lower_triangle] <- lower_network
-  
-  # Return the rewired network
-  return(new_network)
   
 }
 

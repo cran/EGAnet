@@ -1,3 +1,31 @@
+BANNER: New website at https://r-ega.net
+
+Changes in version 2.0.2
+
+o FIX: ties for max gain in `TMFG`
+
+o FIX: continuous variables with few categories that are treated as ordinal in `polychoric.matrix`
+
+o FIX: character input for `structure` is now accepted
+
+o ADD: website pointing to different data check errors added to error output (hopefully, makes errors more understandable)
+
+o UPDATE: `corr = "cor_auto"` now performs `qgraph::cor_auto` in favor of legacy; previous behavior starting at 2.0.0 was to deprecate `"cor_auto"` in favor of `"auto"`; default remains `corr = "auto"`
+
+o UPDATE: `compare.EGA.plots` outputs `$all` and `$individual` for the plots
+
+o UPDATE: when `structure` is supplied for `invariance`, then configural check is skipped (structure is assumed to be invariant)
+
+o UPDATE: added data generation for `model = "BGGM"` and `uni.method = "expand"` in `community.unidimensional`
+
+o DEPENDENCY: {BGGM} has been removed until dependency chain on CRAN can be resolved
+
+
+Changes in version 2.0.1
+
+o updated the polychoric C code to avoid out-of-bounds access errors
+
+
 Changes in version 2.0.0
 
 o MAJOR REFACTOR: the update to version 2.0.0 includes many major changes that are designed to improve the speed, reliability, and reproducibility of {EGAnet}. The goal of these changes are to eliminate common errors and streamline the code in the package to prevent future error cases. There are several function additions that are provided to facilitate modular use of the {EGAnet} package

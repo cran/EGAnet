@@ -21,12 +21,10 @@
 #' 
 #' \itemize{
 #' 
-#' \item{\code{"pairwise"} --- }
-#' {Computes correlation for all available cases between
-#' two variables}
+#' \item \code{"pairwise"} --- Computes correlation for all available cases between
+#' two variables
 #' 
-#' \item{\code{"listwise"} --- }
-#' {Computes correlation for all complete cases in the dataset}
+#' \item \code{"listwise"} --- Computes correlation for all complete cases in the dataset
 #' 
 #' }
 #' 
@@ -36,17 +34,14 @@
 #' 
 #' \itemize{
 #' 
-#' \item{\code{"none"} --- }
-#' {Adds no value (\code{empty.value = "none"})
-#' to the empirical joint frequency table between two variables}
+#' \item \code{"none"} --- Adds no value (\code{empty.value = "none"})
+#' to the empirical joint frequency table between two variables
 #' 
-#' \item{\code{"zero"} --- }
-#' {Adds \code{empty.value} to the cells with zero
-#' in the joint frequency table between two variables}
+#' \item \code{"zero"} --- Adds \code{empty.value} to the cells with zero
+#' in the joint frequency table between two variables
 #' 
-#' \item{\code{"all"} --- }
-#' {Adds \code{empty.value} to all
-#' in the joint frequency table between two variables}
+#' \item \code{"all"} --- Adds \code{empty.value} to all
+#' in the joint frequency table between two variables
 #' 
 #' }
 #' 
@@ -57,20 +52,19 @@
 #' 
 #' \itemize{
 #' 
-#' \item{\code{"none"} --- }
-#' {Adds no value (\code{0}) to the empirical joint
-#' frequency table between two variables}
+#' \item \code{"none"} --- Adds no value (\code{0}) to the empirical joint
+#' frequency table between two variables
 #' 
-#' \item{\code{"point_five"} --- }
-#' {Adds \code{0.5} to the cells defined by \code{empty.method}}
+#' \item \code{"point_five"} --- Adds \code{0.5} to the cells defined by \code{empty.method}
 #' 
-#' \item{\code{"one_over"} --- }
-#' {Adds \code{1 / n} where \emph{n} equals the number of cells
+#' \item \code{"one_over"} --- Adds \code{1 / n} where \emph{n} equals the number of cells
 #' based on \code{empty.method}. For \code{empty.method = "zero"},
 #' \emph{n} equals the number of \emph{zero} cells
-#' }
 #' 
 #' }
+#' 
+#' @param ... Not used but made available for easier
+#' argument passing
 #' 
 #' @return Returns a polychoric correlation matrix
 #' 
@@ -122,11 +116,12 @@
 #' @export
 #'
 # Compute polychoric correlation matrix
-# Updated 19.08.2023
+# Updated 24.10.2023
 polychoric.matrix <- function(
     data, na.data = c("pairwise", "listwise"),
     empty.method = c("none", "zero", "all"),
-    empty.value = c("none", "point_five", "one_over")
+    empty.value = c("none", "point_five", "one_over"),
+    ...
 )
 {
   
@@ -135,11 +130,16 @@ polychoric.matrix <- function(
   empty.method <- set_default(empty.method, "none", polychoric.matrix)
   if(missing(empty.value)){empty.value <- "none"}
   
-  # Ensure data is a matrix
-  data <- as.matrix(usable_data(data, verbose = TRUE))
+  # Check for need to check for usable data
+  if(needs_usable(list(...))){
+    data <- usable_data(data, verbose = TRUE)
+  }
   
-  # Argument errors
-  polychoric.matrix_errors(data)
+  # Ensure data is a matrix
+  data <- as.matrix(data)
+  
+  # Argument errors (try to return ordinal data)
+  data <- polychoric.matrix_errors(data)
   
   # Check for missing data
   if(na.data == "pairwise"){
@@ -185,16 +185,49 @@ polychoric.matrix <- function(
 
 #' @noRd
 # Argument errors ----
-# Updated 13.08.2023
+# Updated 04.09.2023
 polychoric.matrix_errors <- function(data)
 {
+  
+  # Attempt to convert all data to be ordinal
+  data <- column_apply(data, continuous2categorical)
   
   # 'data' errors
   range_error(data, c(0, 11), "polychoric.matrix")
   
+  # Return data
+  return(data)
+  
 }
 
-
+#' @noRd
+# Convert continuous to categorical data ----
+# If continuous data is passed but has few values,
+# then it is treated as categorical
+# In order to pass these non-integer values to C,
+# these values need to be converted
+# Updated 04.09.2023
+continuous2categorical <- function(values)
+{
+ 
+  # Get non-NA indices
+  non_NA <- !is.na(values)
+  
+  # Get non-NA values
+  actual_values <- values[non_NA]
+  
+  # Return values into actual values
+  values[non_NA] <- swiftelse(
+    all(actual_values == as.integer(actual_values)),
+    actual_values, # all are integer, so return values "as-is"
+    as.numeric(factor(actual_values))
+    # not all are integer, so convert to integer
+  )
+  
+  # Check for conversion
+  return(values)
+  
+}
 
 
 

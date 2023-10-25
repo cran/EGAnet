@@ -29,21 +29,21 @@
 #' 
 #' \itemize{
 #' 
-#' \item{\code{"auto"} --- }
-#' {Automatically computes appropriate correlations for
+#' \item \code{"auto"} --- Automatically computes appropriate correlations for
 #' the data using Pearson's for continuous, polychoric for ordinal,
 #' tetrachoric for binary, and polyserial/biserial for ordinal/binary with
 #' continuous. To change the number of categories that are considered
 #' ordinal, use \code{ordinal.categories}
-#' (see \code{\link[EGAnet]{polychoric.matrix}} for more details)}
+#' (see \code{\link[EGAnet]{polychoric.matrix}} for more details)
 #' 
-#' \item{\code{"pearson"} --- }
-#' {Pearson's correlation is computed for all variables regardless of
-#' categories}
+#' \item \code{"cor_auto"} --- Uses \code{\link[qgraph]{cor_auto}} to compute correlations. 
+#' Arguments can be passed along to the function
 #' 
-#' \item{\code{"spearman"} --- }
-#' {Spearman's rank-order correlation is computed for all variables
-#' regardless of categories}
+#' \item \code{"pearson"} --- Pearson's correlation is computed for all 
+#' variables regardless of categories
+#' 
+#' \item \code{"spearman"} --- Spearman's rank-order correlation is computed 
+#' for all variables regardless of categories
 #' 
 #' }
 #' 
@@ -57,12 +57,10 @@
 #' 
 #' \itemize{
 #' 
-#' \item{\code{"pairwise"} --- }
-#' {Computes correlation for all available cases between
-#' two variables}
+#' \item \code{"pairwise"} --- Computes correlation for all available cases between
+#' two variables
 #' 
-#' \item{\code{"listwise"} --- }
-#' {Computes correlation for all complete cases in the dataset}
+#' \item \code{"listwise"} --- Computes correlation for all complete cases in the dataset
 #' 
 #' }
 #' 
@@ -142,10 +140,10 @@
 #'
 #' @export
 # TMFG Filtering Method----
-# Updated 04.08.2023
+# Updated 24.10.2023
 TMFG <- function(
     data, n = NULL,
-    corr = c("auto", "pearson", "spearman"),
+    corr = c("auto", "cor_auto", "pearson", "spearman"),
     na.data = c("pairwise", "listwise"),
     partial = FALSE, returnAllResults = FALSE,
     verbose = FALSE, 
@@ -154,7 +152,7 @@ TMFG <- function(
 {
   
   # Argument errors (return data in case of tibble)
-  data <- TMFG_errors(data, n, partial, returnAllResults, verbose)
+  data <- TMFG_errors(data, n, partial, returnAllResults, verbose, ...)
   
   # Check for missing arguments (argument, default, function)
   corr <- set_default(corr, "auto", TMFG)
@@ -167,7 +165,8 @@ TMFG <- function(
   output <- obtain_sample_correlations(
     data = data, n = 1, # "n" is not used but input `1` to avoid error
     corr = corr, na.data = na.data, 
-    verbose = verbose, ...
+    verbose = verbose, needs_usable = FALSE, # skips usable data check
+    ...
   )
   
   # Get correlations
@@ -243,7 +242,7 @@ TMFG <- function(
   
   # Loop over remaining edges
   for(i in 5:nodes){
-    
+  
     # Check for one remaining node
     if(length(remaining) == 1){
       
@@ -253,8 +252,19 @@ TMFG <- function(
       
     }else{
       
+      # Get max gains
+      max_gains <- gain[remaining,] == max(gain[remaining,])
+      
+      # Get total gains
+      total_gains <- sum(max_gains)
+
+      # Check for more than 1
+      if(total_gains > 1){
+        max_gains[max_gains][2:total_gains] <- FALSE
+      }
+      
       # Vectorized solution (avoids nested loop)
-      gain_location <- which(gain[remaining,] == max(gain[remaining,]), arr.ind = TRUE)
+      gain_location <- which(max_gains, arr.ind = TRUE)
       
       # Obtain existing vertex (already in network)
       # and vertex from remaining based on the maximum gain
@@ -395,8 +405,8 @@ TMFG <- function(
 
 #' @noRd
 # Errors ----
-# Updated 19.08.2023
-TMFG_errors <- function(data, n, partial, returnAllResults, verbose)
+# Updated 07.09.2023
+TMFG_errors <- function(data, n, partial, returnAllResults, verbose, ...)
 {
   
   # 'data' errors
@@ -425,8 +435,13 @@ TMFG_errors <- function(data, n, partial, returnAllResults, verbose)
   length_error(verbose, 1, "TMFG")
   typeof_error(verbose, "logical", "TMFG")
   
+  # Check for usable data
+  if(needs_usable(list(...))){
+    data <- usable_data(data, verbose)
+  }
+  
   # Return usable data in case of tibble
-  return(usable_data(data, verbose))
+  return(data)
   
 }
 

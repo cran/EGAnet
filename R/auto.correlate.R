@@ -32,12 +32,11 @@
 #' 
 #' \itemize{
 #' 
-#' \item{\code{"pairwise"} --- }
-#' {Computes correlation for all available cases between
-#' two variables}
+#' \item \code{"pairwise"} --- Computes correlation for all available 
+#' cases between two variables
 #' 
-#' \item{\code{"listwise"} --- }
-#' {Computes correlation for all complete cases in the dataset}
+#' \item \code{"listwise"} --- Computes correlation for all complete 
+#' cases in the dataset
 #' 
 #' }
 #' 
@@ -48,17 +47,14 @@
 #' 
 #' \itemize{
 #' 
-#' \item{\code{"none"} --- }
-#' {Adds no value (\code{empty.value = "none"})
-#' to the empirical joint frequency table between two variables}
+#' \item \code{"none"} --- Adds no value (\code{empty.value = "none"})
+#' to the empirical joint frequency table between two variables
 #' 
-#' \item{\code{"zero"} --- }
-#' {Adds \code{empty.value} to the cells with zero
-#' in the joint frequency table between two variables}
+#' \item \code{"zero"} --- Adds \code{empty.value} to the cells with 
+#' zero in the joint frequency table between two variables
 #' 
-#' \item{\code{"all"} --- }
-#' {Adds \code{empty.value} to all
-#' in the joint frequency table between two variables}
+#' \item \code{"all"} --- Adds \code{empty.value} to all
+#' in the joint frequency table between two variables
 #' 
 #' }
 #' 
@@ -69,18 +65,15 @@
 #' 
 #' \itemize{
 #' 
-#' \item{\code{"none"} --- }
-#' {Adds no value (\code{0}) to the empirical joint 
-#' frequency table between two variables}
+#' \item \code{"none"} --- Adds no value (\code{0}) to the empirical 
+#' joint  frequency table between two variables
 #' 
-#' \item{\code{"point_five"} --- }
-#' {Adds \code{0.5} to the cells defined by \code{empty.method}}
+#' \item \code{"point_five"} --- Adds \code{0.5} to the cells 
+#' defined by \code{empty.method}
 #' 
-#' \item{\code{"one_over"} --- }
-#' {Adds \code{1 / n} where \code{n} equals the number of cells
-#' based on \code{empty.method}. For \code{empty.method = "zero"},
-#' \code{n} equals the number of zero cells
-#' }
+#' \item \code{"one_over"} --- Adds \code{1 / n} where \code{n} equals the 
+#' number of cells based on \code{empty.method}. For 
+#' \code{empty.method = "zero"}, \code{n} equals the number of zero cells
 #' 
 #' }
 #' 
@@ -104,7 +97,7 @@
 #' @export
 #'
 # Automatic correlations ----
-# Updated 09.08.2023
+# Updated 07.09.2023
 auto.correlate <- function(
     data, # Matrix or data frame
     corr = c("kendall", "pearson", "spearman"), # allow changes to standard correlations
@@ -119,7 +112,7 @@ auto.correlate <- function(
 {
   
   # Argument errors (return data in case of tibble)
-  data <- auto.correlate_errors(data, ordinal.categories, forcePD, verbose)
+  data <- auto.correlate_errors(data, ordinal.categories, forcePD, verbose, ...)
   
   # Check for missing arguments (argument, default, function)
   corr <- set_default(corr, "pearson", auto.correlate)
@@ -183,7 +176,8 @@ auto.correlate <- function(
           categorical_variables, categorical_variables # ensure proper indexing
         ] <- polychoric.matrix(
           data = data[,categorical_variables], na.data = na.data,
-          empty.method = empty.method, empty.value = empty.value
+          empty.method = empty.method, empty.value = empty.value,
+          needs_usable = FALSE # skip usable data check
         )
         
       }
@@ -321,8 +315,8 @@ auto.correlate <- function(
 
 #' @noRd
 # Errors ----
-# Updated 19.08.2023
-auto.correlate_errors <- function(data, ordinal.categories, forcePD, verbose)
+# Updated 07.09.2023
+auto.correlate_errors <- function(data, ordinal.categories, forcePD, verbose, ...)
 {
   
   # 'data' errors
@@ -346,8 +340,13 @@ auto.correlate_errors <- function(data, ordinal.categories, forcePD, verbose)
   length_error(verbose, 1, "auto.correlate")
   typeof_error(verbose, "logical", "auto.correlate")
   
+  # Check for usable data
+  if(needs_usable(list(...))){
+    data <- usable_data(data, verbose)
+  }
+  
   # Return usable data (in case of tibble)
-  return(usable_data(data, verbose))
+  return(data)
   
 }
 

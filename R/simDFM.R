@@ -19,12 +19,11 @@
 #'
 #' \itemize{
 #'
-#' \item{\strong{\code{DAFS}}}
-#' {Simulates data using the direct autoregressive factor score model.
-#' This is the default method}
+#' \item \strong{\code{DAFS}} --- Simulates data using the direct autoregressive factor score model.
+#' This is the default method
 #'
-#' \item{\strong{\code{RandomWalk}}}
-#' {Simulates data using a dynamic factor model with random walk factor scores.}
+#' \item \strong{\code{RandomWalk}} --- Simulates data using a dynamic factor model with random walk factor scores
+#'
 #'}
 #'
 #' @param loadings Magnitude of the loadings.
@@ -49,8 +48,8 @@
 #' # Estimate EGA network
 #' data1 <- simDFM(variab = 5, timep = 50, nfact = 3, error = 0.05,
 #' dfm = "DAFS", loadings = 0.7, autoreg = 0.8,
-#' crossreg = 0.1, var.shock = 0.18,
-#' cov.shock = 0.36, burnin = 1000)}
+#' crossreg = 0.1, var.shock = 0.36,
+#' cov.shock = 0.18, burnin = 1000)}
 #'
 #' @references
 #' Engle, R., & Watson, M. (1981).
@@ -65,7 +64,7 @@
 #'
 #' @export
 # Simulate dynamic factor model
-# Updated 04.09.2022
+# Updated 24.10.2022
 simDFM <- function(
     variab, timep, nfact, error, dfm = c("DAFS","RandomWalk"),
     loadings, autoreg, crossreg, var.shock, cov.shock, burnin = 1000,
@@ -103,7 +102,7 @@ simDFM <- function(
       # Shock = Random shock vectors following a multivariate normal distribution with mean zeros and nfact x nfact q covariance matrix D
       D <- matrix(
         # Add some variation
-        var.shock + runif(nfact * nfact, -0.05, 0.05),
+        cov.shock + runif(nfact * nfact, -0.05, 0.05),
         nfact,
         nfact
       )
@@ -111,7 +110,7 @@ simDFM <- function(
       D <- (t(D) + D) / 2
       
       # Add some variation
-      diag(D) <- cov.shock + runif(nfact, -0.05, 0.05)
+      diag(D) <- var.shock + runif(nfact, -0.05, 0.05)
       
       # Compute shock
       Shock <- MASS_mvrnorm(
@@ -135,8 +134,8 @@ simDFM <- function(
       diag(B) <- autoreg
       
       # Shock = Random shock vectors following a multivariate normal distribution with mean zeros and nfact x nfact q covariance matrix D
-      D <- matrix(var.shock, nfact, nfact)
-      diag(D) <- cov.shock
+      D <- matrix(cov.shock, nfact, nfact)
+      diag(D) <- var.shock
       Shock <- MASS_mvrnorm(burnin+timep,matrix(0,nfact,1),D)
       
       Fscores <- matrix(0,burnin+timep,nfact)
@@ -184,7 +183,12 @@ simDFM <- function(
   results <- list()
   results$data <- obs.data
   results$Fscores <- as.data.frame(Fscores)
-  colnames(results$Fscores) <- paste0("F", 1:ncol(Fscores))
+  if(nfact>1){
+    colnames(results$Fscores) <- paste0("F", 1:ncol(Fscores))  
+  }else{
+    colnames(results$Fscores) <- "F1"
+  }
+  
   results$LoadMat <- LoadMat
   results$Structure <- rep(1:nfact, each = variab)
   return(results)
