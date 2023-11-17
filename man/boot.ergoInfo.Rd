@@ -8,6 +8,7 @@ boot.ergoInfo(
   dynEGA.object,
   EII,
   use = c("edge.list", "unweighted", "weighted"),
+  shuffles = 5000,
   iter = 100,
   ncores,
   verbose = TRUE
@@ -27,23 +28,27 @@ If no \code{\link[EGAnet]{ergoInfo}} object is provided, then it is estimated}
 \item{use}{Character (length = 1).
 A string indicating what network element will be used
 to compute the algorithm complexity, the list of edges or the weights of the network.
-Defaults to \code{use = "edge.list"}.
+Defaults to \code{use = "unweighted"}.
 Current options are:
 
 \itemize{
 
 \item \code{"edge.list"} --- Calculates the algorithm complexity using the list of edges
 
-\item \code{"unweighted"} --- Calculates the algorithm complexity using the binary weights of the network.
-0 = edge absent and 1 = edge present
+\item \code{"unweighted"} --- Calculates the algorithm complexity using the binary weights of the encoded prime 
+transformed network. 0 = edge absent and 1 = edge present
 
 \item \code{"weighted"} --- Calculates the algorithm complexity using the weights of encoded prime-weight transformed network
 
 }}
 
+\item{shuffles}{Numeric.
+Number of shuffles used to compute the Kolmogorov complexity.
+Defaults to \code{5000}}
+
 \item{iter}{Numeric (length = 1).
 Number of replica samples to generate from the bootstrap analysis.
-Defaults to \code{100} (recommended)}
+Defaults to \code{100} (\code{1000} for robustness)}
 
 \item{ncores}{Numeric (length = 1).
 Number of cores to use in computing results.
@@ -75,33 +80,45 @@ with small variation in the population structure}
 \item{interpretation}{How you can interpret the result of the test in plain English}
 }
 \description{
-Tests the Ergodicity Information Index obtained in the empirical sample 
-with a distribution of EII obtained by bootstrap sampling
-(see \strong{Details} for the procedure)
+Tests the Ergodicity Information Index obtained in the 
+empirical sample with a distribution of EII obtained by a variant of
+bootstrap sampling (see \strong{Details} for the procedure)
 }
 \details{
-In traditional bootstrap sampling, individual participants are resampled with 
-replacement from the empirical sample. This process is time consuming when carried out 
-across \emph{v} number of variables, \emph{n} number of participants,
-\emph{t} number of time points, and \emph{i} number of iterations.
+In traditional bootstrap sampling, individual participants are resampled 
+with replacement from the empirical sample. This process is time consuming 
+when carried out across \emph{v} number of variables, \emph{n} number of 
+participants, \emph{t} number of time points, and \emph{i} number of iterations.
+Instead, \code{boot.ergoInfo} uses the premise of an ergodic process to 
+establish more efficient test that works directly on the sample's networks.
 
-A more efficient process, the approach applied here, is to obtain a sampling distribution 
-of EII values as if all participants in the data have the population network structure. 
-Sampling is not perfect and therefore random noise is added to the edges of the population 
-structure to simulate sampling variability. This noise follows a random uniform distribution
-ranging from -0.10 to 0.10. In addition, a proportion of edges are rewired to allow for 
-slight variations on the population structure. The proportion of nodes that are rewired is 
-sampled from a random uniform distribution between 0.20 to 0.40. This process is carried out 
-for each participant resulting in \emph{n} variations of the population structure. 
-Afterward, EII is computed. This process is carried out for \emph{i} iterations (e.g., 100).
+With an ergodic process, the expectation is that all individuals will have
+a systematic relationship with the population. Destroying this relationship
+should result in a significant loss of information. Following this conjecture,
+\code{boot.ergoInfo} shuffles a random subset of edges that exist in the
+\strong{population} that is \emph{equal} to the number of shared edges
+it has with an individual. An individual's unique edges remain the same,
+controlling for their unique information. The result is a replicate individual
+that contains the same total number of edges as the actual individual but
+its shared information with the population has been scrambled. 
 
-The result is a sampling distribution of EII values that would be expected if the process 
-was ergodic. If the empirical EII value is significantly less than the distribution or 
-not significantly different, then  the empirical data can be expected to be generated 
-from an ergodic process and the population structure is  sufficient to describe all 
-individuals. If the empirical EII value is significantly greater than the distribution, 
-then the empirical data cannot be described by the population structure -- significant 
-information is lost when collapsing across to the population structure.
+This process is repeated over each individual to create a replicate sample
+and is repeated for \emph{X} iterations (e.g., 100). This approach creates
+a sampling distribution that represents the expected information between
+the population and individuals when a random process generates the shared
+information between them. If the shared information between the population
+and individuals in the empirical sample is sufficiently meaningful, then
+this process should result in significant information loss.
+
+How to interpret the results: the result of \code{boot.ergoInfo} is a sampling 
+distribution of EII values that would be expected if the process was random 
+(null distribution). If the empirical EII value is \emph{greater than} or
+not significantly different from the null distribution, then the empirical 
+data can be expected to be generated from an nonergodic process and the 
+population structure is not sufficient to describe all individuals. If the 
+empirical EII value is significantly \emph{lower than} the null distribution, 
+then the empirical data can be described by the population structure -- the
+population structure is sufficient to describe all individuals.
 }
 \examples{
 # Obtain simulated data
@@ -116,12 +133,12 @@ dyn1 <- dynEGA.ind.pop(
 )
 
 # Empirical Ergodicity Information Index
-eii1 <- ergoInfo(dynEGA.object = dyn1, use = "edge.list")
+eii1 <- ergoInfo(dynEGA.object = dyn1, use = "unweighted")
 
 # Bootstrap Test for Ergodicity Information Index
 testing.ergoinfo <- boot.ergoInfo(
   dynEGA.object = dyn1, EII = eii1,
-  ncores = 2
+  ncores = 2, use = "unweighted"
 )
 
 # Plot result
@@ -135,7 +152,7 @@ dyn2 <- dynEGA(
 )
 
 # Empirical Ergodicity Information Index
-eii2 <- ergoInfo(dynEGA.object = dyn2, use = "edge.list")
+eii2 <- ergoInfo(dynEGA.object = dyn2, use = "unweighted")
 
 # Bootstrap Test for Ergodicity Information Index
 testing.ergoinfo2 <- boot.ergoInfo(
@@ -149,7 +166,7 @@ plot(testing.ergoinfo2)}
 }
 \references{
 \strong{Original Implementation} \cr
-Golino, H., Nesselroade, J., & Christensen, A. P. (2022).
+Golino, H., Nesselroade, J. R., & Christensen, A. P. (2022).
 Toward a psychology of individuals: The ergodicity information index and a bottom-up approach for finding generalizations.
 \emph{PsyArXiv}.
 }

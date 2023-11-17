@@ -46,7 +46,7 @@
 #' @export
 #' 
 # Information Theoretic Clustering for dynEGA
-# Updated 22.10.2023
+# Updated 12.11.2023
 infoCluster <- function(dynEGA.object, plot.cluster = TRUE)
 {
   
@@ -73,135 +73,48 @@ infoCluster <- function(dynEGA.object, plot.cluster = TRUE)
   diag(jsd_matrix) <- NA
   
   # Remove all NAs
-  rm_cols <- lvapply(
+  rm_cols <- !lvapply(
     as.data.frame(jsd_matrix), function(x){all(is.na(x))}
   )
     
-  # Remove missing data points
-  jsd_matrix <- jsd_matrix[!rm_cols, !rm_cols]
+  # Remove missing data points and convert to distance
+  jsd_matrix <- jsd_matrix[rm_cols, rm_cols]
   
   # Get similarity matrix
   jss_matrix <- 1 - jsd_matrix
   
   # Make diagonal 0 again
   diag(jss_matrix) <- diag(jsd_matrix) <- 0
-  
-  # Perform hierarchical clustering (follows Walktrap)
+
+  # Use agglomerative Ward's D
   hier_clust <- hclust(
     d = as.dist(jsd_matrix),
-    method = "complete"
+    method = "ward.D2"
   )
-  
+
   # Get number of cases
   cases <- dim(jsd_matrix)[2]
 
   # Get cut sequence
-  cut_sequence <- seq_len(cases)
+  cut_sequence <- seq_len(cases)[-1]
 
   # Obtain cuts
   hier_cuts <- lapply(cut_sequence, function(i){
     cutree(hier_clust, i)
   })
 
-  # Name cuts
-  names(hier_cuts) <- cut_sequence
-
-  # Make any cuts with singleton clusters NULL
-  remaining_cuts <- !lvapply(
-    hier_cuts, function(x){any(table(x) == 1)}
-  )
-
-  # Obtain cuts
-  cuts <- as.numeric(names(remaining_cuts)[remaining_cuts])
-
-  # Get modularities
+  # Compute modularity over solutions
   Qs <- nvapply(
-    hier_cuts[cuts], function(cuts){
-      modularity(jss_matrix, cuts)
+    hier_cuts, function(cut){
+      modularity(jss_matrix, cut, resolution = 1.01)
     }
   )
-
-  # Get largest change in the modularity index
+  
+  # Switch based on positive modularity
   Q_index <- which.max(Qs)
   
   # Obtain clusters
-  clusters <- hier_cuts[[Q_index]] # cutree(hier_clust, cuts[Q_index])
-  
-  # Check if single cluster
-  if(unique_length(clusters) == 1){
-
-    # Get lower triangle
-    lower_triangle <- lower.tri(individual_networks[[1]])
-    
-    # Generate random networks
-    random_networks <- lapply(
-      individual_networks, rewire,
-      min = 0.05, max = 0.05, noise = NULL,
-      lower_triangle = lower_triangle
-    )
-    
-    # Get the random JSD matrix
-    jsd_random_matrix <- pairwise_spectral_JSD(random_networks)
-    
-    # Make diagonal NA
-    diag(jsd_random_matrix) <- NA
-    
-    # Remove all NAs
-    rm_cols <- lvapply(
-      as.data.frame(jsd_random_matrix), function(x){all(is.na(x))}
-    )
-    
-    # Remove missing data points
-    jsd_random_matrix <- jsd_random_matrix[!rm_cols, !rm_cols]
-
-    # Make diagonal 0 again
-    diag(jsd_random_matrix) <- 0
-
-    # Compare to empirical
-    comparison <- t.test(
-      jsd_matrix[lower_triangle],
-      jsd_random_matrix[lower_triangle],
-      paired = TRUE,
-      var.equal = FALSE
-    )
-    
-    # Obtain sign of statistic
-    comparison_sign <- sign(comparison$statistic)
-    
-    # Compute adaptive alpha
-    adaptive_p <- adapt.a(
-      test = "paired",
-      n = length(lower_triangle),
-      alpha = .001,
-      power = 0.80,
-      efxize = "small"
-    )
-    
-    # Compute Cohen's d
-    cohens_d <- d(
-      jsd_matrix[lower_triangle],
-      jsd_random_matrix[lower_triangle],
-      paired = TRUE
-    )
-    
-    # Check for empirical JSD > random JSD OR non-significant t-test
-    if(comparison_sign == 1 | abs(cohens_d) < 0.20){
-      
-      # Set clusters to all individuals
-      clusters <- cut_sequence
-      names(clusters) <- dimnames(jsd_matrix)[[2]]
-      
-    }
-    
-    # Compile results
-    single_cluster <- list(
-      JSD_random = jsd_random_matrix,
-      t.test = comparison,
-      adaptive.p.value = adaptive_p,
-      d = cohens_d
-    )
-
-  }
+  clusters <- hier_cuts[[Q_index]]
   
   # Set up results
   results <- list(
@@ -210,11 +123,6 @@ infoCluster <- function(dynEGA.object, plot.cluster = TRUE)
     clusterTree = hier_clust,
     JSD = jsd_matrix
   )
-  
-  # Check for single cluster test
-  if(exists("single_cluster")){
-    results$single.cluster.test <- single_cluster
-  }
 
   # Set class
   class(results) <- "infoCluster"
@@ -264,119 +172,57 @@ summary.infoCluster <- function(object, ...)
 #' @exportS3Method 
 # S3 Plot Method ----
 # Works fast enough, so leaving as original code
-# Updated 12.10.2023
-plot.infoCluster <- function(x, ...)
+# Updated 16.11.2023
+plot.infoCluster <- function(x, label_size = 3, ...)
 {
   
-  # Prepare data for {ggplot2}
-  cluster_data <- ggdendro::dendro_data(x$clusterTree)
+  # Get maximum clusters
+  max_clusters <- max(x$clusters)
   
-  # Get clusters
-  clusters <- x$clusters
+  # Get cluster sequence
+  cluster_sequence <- seq_len(max_clusters)
+
+  # Get color palette
+  color_palette <- color_palette_EGA("polychrome", wc = rev(cluster_sequence))
   
-  # Create data frame
-  cluster_df <- data.frame(
-    label = names(clusters),
-    cluster = factor(clusters)
+  # Get dendrogram and color branches
+  cluster_data <- dendextend::as.ggdend(
+    dendextend::color_branches(
+      as.dendrogram(x$clusterTree),
+      clusters =  x$clusters[x$clusterTree$order],
+      col = color_palette
+    )
   )
   
-  # Merge data
-  cluster_data$labels <- merge(
-    cluster_data$labels, cluster_df,
-    by = "label"
+  # Change NA to grey
+  cluster_data$segments$col[is.na(cluster_data$segments$col)] <- "grey"
+  
+  # Update color palette
+  color_palette <- c("grey", rev(color_palette))
+  
+  # Factor segments by color
+  cluster_data$segments$col <- factor(
+    cluster_data$segments$col, levels = color_palette
   )
-  
-  # Split dendrogram into upper grey section and lower coloured section
-  cut <- unique_length(clusters)
-  
-  # Check for maximum clusters (i.e., no clusters)
-  if(cut != length(clusters)){
-    
-    unique_y_segments <- unique(cluster_data$segments$y)
-    height <- unique_y_segments[order(unique_y_segments, decreasing = TRUE)]
-    cut.height <- mean(c(height[cut], height[cut-1]))
-    cluster_data$segments$line <- swiftelse(cluster_data$segments$y == cluster_data$segments$yend &
-                                              cluster_data$segments$y > cut.height, 1, 2)
-    cluster_data$segments$line <- swiftelse(cluster_data$segments$yend  > cut.height, 1, cluster_data$segments$line)
-    
-    # Number the clusters
-    cluster_data$segments$cluster <- c(-1, diff(cluster_data$segments$line))
-    change <- which(cluster_data$segments$cluster == 1)
-    for (i in 1:cut) cluster_data$segments$cluster[change[i]] = i + 1
-    cluster_data$segments$cluster <-  swiftelse(cluster_data$segments$line == 1, 1, 
-                                                swiftelse(cluster_data$segments$cluster == 0, NA, cluster_data$segments$cluster))
-    
-    
-    # Replace NA values in cluster
-    if(!all(is.na(cluster_data$segments$cluster))){
-      for(i in seq_along(cluster_data$segments$cluster)){
-        
-        if(is.na(cluster_data$segments$cluster[i])){
-          cluster_data$segments$cluster[i] <- cluster_data$segments$cluster[i-1]
-        }
-        
-      }
-    }else{
-      cluster_data$segments$cluster <- -1
-    }
-    
-    
-    # Consistent numbering between segment$cluster and label$cluster
-    cluster_df$label <- factor(cluster_df$label, levels = cluster_data$labels$label)
-    cluster_df$cluster <- factor((cluster_df$cluster), levels = unique(cluster_df$cluster), labels = (1:cut) + 1)
-    cluster_data[["labels"]] <- merge(cluster_data[["labels"]], cluster_df, by = "label")
-    
-    # Positions for cluster labels
-    n.rle <- rle(cluster_data$segments$cluster)
-    N <- cumsum(n.rle$lengths)
-    N <- N[seq(1, length(N), 2)] + 1
-    N.df <- cluster_data$segments[N, ]
-    N.df$cluster <- N.df$cluster - 1
-    
-    # Check for all the same cluster
-    if(all(cluster_data$segments$cluster == -1)){
-      cluster_data$segments$cluster <- rep(
-        1, length(cluster_data$segments$cluster)
-      )
-    }
-    
-  }else{
-    
-    # Set clusters to 1
-    cluster_data$segments$cluster <- 1
-    
-  }
-  
-  # Ensure clusters are factors
-  cluster_data$segments$cluster <- as.factor(
-    cluster_data$segments$cluster
-  )
-  
-  # Make labels
-  if(max(clusters) == 1){
-    label <- "1"
-  }else{
-    label <- c("", 1:max(clusters))
-  }
-  
+
   # Set up plot
-  cluster_plot <- ggplot2::ggplot() +
+  cluster_plot <- ggplot2::ggplot() + 
     ggplot2::geom_segment(
       data = cluster_data$segment,
-      ggplot2::aes(x = x, y = y, xend = xend, yend = yend, color = cluster)
+      ggplot2::aes(
+        x = x, y = y, 
+        xend = xend, yend = yend, 
+        color = col
+      )
     ) +
     ggplot2::geom_text(
-      data = cluster_data$label,
+      data = cluster_data$labels,
       ggplot2::aes(x, y, label = label, hjust = 0),
-      size = 3
+      size = label_size
     ) +
     ggplot2::scale_color_manual(
-      labels = label,
-      values = c(
-        "grey", color_palette_EGA(
-              "polychrome", wc = 1:max(clusters)
-        )
-      )
+      labels = c("", cluster_sequence),
+      values = color_palette
     ) +
     ggplot2::coord_flip() + 
     ggplot2::scale_y_reverse(expand = c(0.2, 0)) + 
@@ -393,29 +239,11 @@ plot.infoCluster <- function(x, ...)
     ggplot2::guides(
       color = ggplot2::guide_legend(title = "Cluster")
     )
-  
-  # Check whether "N.df" exists
-  if(exists("N.df")){
-    
-    cluster_plot <- cluster_plot +
-      ggplot2::geom_text(
-        data = N.df,
-        ggplot2::aes(
-          x = x, y = y, label = factor(cluster),
-          colour = factor(cluster + 1)
-        ),
-        hjust = 1.5, show.legend = FALSE
-      )
-    
-  }
-  
-  
+ 
   # Remove clusters if none
-  if(all(clusters == ncol_sequence(x$JSD))){
+  if(all(x$clusters == ncol_sequence(x$JSD))){
     cluster_plot <- cluster_plot +
-      ggplot2::theme(
-        legend.position = "none"
-      )
+      ggplot2::theme(legend.position = "none")
   }
   
   # Return plot
@@ -425,8 +253,8 @@ plot.infoCluster <- function(x, ...)
 
 #' @noRd
 # Global variables needed for CRAN checks ----
-# Updated 04.08.2023
-utils::globalVariables(c("x", "y", "xend", "yend", "cluster")) 
+# Updated 17.11.2023
+utils::globalVariables(c("x", "y", "xend", "yend", "cluster", "label")) 
 
 
 

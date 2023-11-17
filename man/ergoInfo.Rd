@@ -7,7 +7,7 @@
 ergoInfo(
   dynEGA.object,
   use = c("edge.list", "unweighted", "weighted"),
-  ordering = c("row", "column")
+  shuffles = 5000
 )
 }
 \arguments{
@@ -16,7 +16,7 @@ ergoInfo(
 \item{use}{Character (length = 1).
 A string indicating what network element will be used
 to compute the algorithm complexity, the list of edges or the weights of the network.
-Defaults to \code{use = "edge.list"}.
+Defaults to \code{use = "unweighted"}.
 Current options are:
 
 \itemize{
@@ -30,11 +30,9 @@ transformed network. 0 = edge absent and 1 = edge present
 
 }}
 
-\item{ordering}{Character (length = 1).
-Changes ordering of edge list.
-\code{"row"} goes across the rows;
-\code{"column"} goes down the columns.
-Defaults to \code{"row"}}
+\item{shuffles}{Numeric.
+Number of shuffles used to compute the Kolmogorov complexity.
+Defaults to \code{5000}}
 }
 \value{
 Returns a list containing:
@@ -67,11 +65,14 @@ dyn.ega1 <- dynEGA.ind.pop(
 )
 
 # Compute empirical ergodicity information index
-eii <- ergoInfo(
-  dynEGA.object = dyn.ega1,
-  use = "edge.list"
-)}
+eii <- ergoInfo(dyn.ega1)}
 
+}
+\references{
+\strong{Original Implementation} \cr
+Golino, H., Nesselroade, J. R., & Christensen, A. P. (2022).
+Toward a psychology of individuals: The ergodicity information index and a bottom-up approach for finding generalizations.
+\emph{PsyArXiv}.
 }
 \author{
 Hudson Golino <hfg9s at virginia.edu> and Alexander Christensen <alexpaulchristensen@gmail.com>

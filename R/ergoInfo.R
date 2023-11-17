@@ -7,7 +7,7 @@
 #' @param use Character (length = 1).
 #' A string indicating what network element will be used
 #' to compute the algorithm complexity, the list of edges or the weights of the network.
-#' Defaults to \code{use = "edge.list"}.
+#' Defaults to \code{use = "unweighted"}.
 #' Current options are:
 #'
 #' \itemize{
@@ -21,11 +21,9 @@
 #' 
 #' }
 #' 
-#' @param ordering Character (length = 1).
-#' Changes ordering of edge list.
-#' \code{"row"} goes across the rows;
-#' \code{"column"} goes down the columns.
-#' Defaults to \code{"row"}
+#' @param shuffles Numeric.
+#' Number of shuffles used to compute the Kolmogorov complexity.
+#' Defaults to \code{5000}
 #'
 #' @return Returns a list containing:
 #'
@@ -56,79 +54,70 @@
 #' )
 #'
 #' # Compute empirical ergodicity information index
-#' eii <- ergoInfo(
-#'   dynEGA.object = dyn.ega1,
-#'   use = "edge.list"
-#' )}
+#' eii <- ergoInfo(dyn.ega1)}
+#' 
+#' @references 
+#' \strong{Original Implementation} \cr
+#' Golino, H., Nesselroade, J. R., & Christensen, A. P. (2022).
+#' Toward a psychology of individuals: The ergodicity information index and a bottom-up approach for finding generalizations.
+#' \emph{PsyArXiv}.
 #'
 #' @export
 #'
 # Ergodicity Information Index ----
-# Updated 24.10.2023
+# Updated 12.11.2023
 ergoInfo <- function(
     dynEGA.object,
     use = c("edge.list", "unweighted", "weighted"),
-    ordering = c("row", "column")
+    shuffles = 5000
 )
 {
   
-  # Send experimental message (for now)
-  experimental("ergoInfo")
-  
   # Check for missing arguments (argument, default, function)
-  use <- set_default(use, "edge.list", ergoInfo)
-  ordering <- set_default(ordering, "row", ergoInfo)
+  use <- set_default(use, "unweighted", ergoInfo)
   
   # Check for appropriate class ("dynEGA.ind.pop" defunct to legacy)
   if(!is(dynEGA.object, "dynEGA") & !is(dynEGA.object, "dynEGA.ind.pop")){
     class_error(dynEGA.object, "dynEGA", "ergoInfo")
   }
   
+  # Control exponential notation of numbers
+  user_scipen <- options("scipen")$scipen
+  
+  # Set option
+  options(scipen = 0)
+  
   # Get proper objects (if not, send an error)
-  dynega_objects <- get_dynEGA_object(dynEGA.object)
+  dynEGA.object <- get_dynEGA_object(dynEGA.object)
   
   # Get individual networks
-  individual_networks <- lapply(dynega_objects$individual, function(x){x$network})
+  individual_networks <- lapply(dynEGA.object$individual, function(x){x$network})
   
   # Get sequence for number of individuals
   individual_sequence <- seq_along(individual_networks)
   
-  # Get adjacency networks
-  adjacency_networks <- lapply(
-    individual_networks, # NAs occur when there is zero variance 
-    function(x){
-      
-      # Get adjacency
-      adjacency <- x != 0 & !is.na(x)
-      
-      # Attach number of edges as attribute
-      attr(adjacency, "edges") <- sum(adjacency) / 2
-      
-      # Return adjacency
-      return(adjacency)
-      
-    }
-  )
-  
-  # Get ANY edges across the individual networks
-  edges <- symmetric_matrix_lapply(adjacency_networks, any)
-  
   # Initialize encoding matrix
-  dimensions <- dim(edges)
+  dimensions <- dim(individual_networks[[1]])
   encoding_matrix <- matrix(1, nrow = dimensions[1], ncol = dimensions[2])
   
   # "unweighted" and "weighted" needs canonical prime association
   if(use != "edge.list"){
     
-    # Get order of each counts
-    edge_ordering <- order(
-      nvapply(adjacency_networks, attr, "edges"), 
-      decreasing = FALSE
-    )
+    # Set individual networks based on use
+    if(use == "unweighted"){
+      
+      # Binarize networks
+      individual_networks <- lapply(
+        individual_networks, # NAs occur when there is zero variance 
+        function(x){return(x != 0 & !is.na(x))}
+      )
+      
+    }
     
-    # Reorder networks and adjacencys
-    individual_networks <- individual_networks[edge_ordering]
-    adjacency_networks <- adjacency_networks[edge_ordering]
+    # Order networks
+    individual_networks <- individual_networks[
+      order(nvapply(individual_networks, edge_count), decreasing = FALSE)
+    ]
     
     # Get prime numbers
     prime_numbers <- get(
@@ -137,81 +126,30 @@ ergoInfo <- function(
     
     # Get prime weights
     prime_weights <- lapply(individual_sequence, function(case){
-      
-      # Create integer weights if weighted
-      if(use == "weighted"){
-        adjacency_networks[[case]] <- individual_networks[[case]]
-      }
-      
-      # Assign primes
-      prime_network <- prime_numbers[case] ^ adjacency_networks[[case]]
-      
-      # Return prime network
-      return(prime_network)
-      
+      return(prime_numbers[[case]] ^ individual_networks[[case]])
     })
     
     # Get encoding matrix
     encoding_matrix <- Reduce("*", prime_weights)
-    
+
     # Revert 1s to 0s
     encoding_matrix[encoding_matrix == 1] <- 0
     
   }
   
-  # Store upper triangle indices (use for population as well)
-  upper_triangle <- upper.tri(edges)
+  # Get edge list (matches {igraph})
+  edge_list <- sparse_network(encoding_matrix)
   
-  # Set upper triangle to FALSE
-  edges[upper_triangle] <- FALSE
-  
-  # Use `keep_weights` for quick indexing
-  keep_weights <- swiftelse(
-    use == "edge.list",
-    c(1L, 2L), c(1L, 2L, 3L)
-  )
-  
-  # Get edge list ("col" then "row" matches {igraph})
-  edge_list <- cbind(
-    which(edges, arr.ind = TRUE)[,c("col", "row")],
-    encoding_matrix[edges]
-  )
-  # Order matters!! (see pasting in `k_complexity`)
-  
-  # Get edge list rows
+  # Get edge list rows (used at the end)
   edge_rows <- dim(edge_list)[1]
   
   # Get edge list sequence
   edge_sequence <- seq_len(edge_rows)
   
-  # Get seeds for reproducible results
-  # Includes default number of iterations (1000)
-  # (defined in Santoro & Nicosia, 2020)
-  # seed_values <- reproducible_seed(n = 1000, seed = seed)
-  iter_sequence <- seq_len(5000)
-  
-  # Get k-complexity
-  individual_kcomplexity <- nvapply( # seed_values,
-    iter_sequence, function(iteration){
-      
-      # Return k-complexity
-      return(
-        k_complexity(
-          edge_list[ # rows
-            shuffle_replace(edge_sequence),
-            keep_weights # either pairwise edges or weights
-          ],
-          ordering = ordering
-        )
-      )
-      
-    }
-  )
-  
   # Set up population
   
   # Get population adjacency
-  population_edges <- dynega_objects$population$network != 0
+  population_edges <- dynEGA.object$population$network != 0
   
   # Initialize population encoding matrix
   population_encoding <- matrix(1, nrow = dimensions[1], ncol = dimensions[2])
@@ -219,12 +157,11 @@ ergoInfo <- function(
   # Branch based on "use"
   if(use != "edge.list"){
     
-    # Create integer weights if weighted
-    if(use == "weighted"){
-      population_encoding <- 2 ^ dynega_objects$population$network
-    }else{
-      population_encoding <- 2 ^ population_edges
-    }
+    # Check for weighted vs. unweighted
+    population_encoding <- 2 ^ swiftelse(
+      use == "unweighted", population_edges,
+      dynEGA.object$population$network
+    )
     
     # Revert 1s to 0s
     population_encoding[population_encoding == 1] <- 0
@@ -232,33 +169,42 @@ ergoInfo <- function(
   }
   
   # Set upper triangle to FALSE
-  population_edges[upper_triangle] <- FALSE
+  population_edges[upper.tri(population_edges)] <- FALSE
   
   # Get edge list ("col" then "row" matches {igraph})
   population_edge_list <- cbind(
     which(population_edges, arr.ind = TRUE)[,c("col", "row")], 
     population_encoding[population_edges]
   )
-  # Order matters!! (see pasting in `k_complexity`)
-  
-  # Get edge list rows
-  population_edge_rows <- dim(population_edge_list)[1]
   
   # Get edge list sequence
-  population_edge_sequence <- seq_len(population_edge_rows)
+  population_edge_sequence <- nrow_sequence(population_edge_list)
   
-  # Get k-complexity
-  population_kcomplexity <- nvapply( # seed_values,
-    iter_sequence, function(single_seed){
+  # K-complexity
+  
+  # Use `keep_weights` for quick indexing
+  keep_weights <- swiftelse(
+    use == "edge.list",
+    c(1L, 2L), c(1L, 2L, 3L)
+  )
+  
+  # Transpose edge lists (more efficient)
+  edge_list <- t(edge_list[,keep_weights])
+  population_edge_list <- t(population_edge_list[,keep_weights])
+  
+  # Get k-complexity for individuals and population
+  kcomplexities <- lapply(
+    seq_len(shuffles), function(iteration){
       
-      # Return k-complexity
+      # Set up return
       return(
-        k_complexity(
-          edge_list[ # rows
-            shuffle_replace(population_edge_sequence),
-            keep_weights # either pairwise edges or weights
-          ],
-          ordering = ordering
+        c(
+          individual = k_complexity(
+            edge_list[,shuffle_replace(edge_sequence)]
+          ),
+          population = k_complexity(
+            population_edge_list[,shuffle_replace(population_edge_sequence)]
+          )
         )
       )
       
@@ -266,14 +212,20 @@ ergoInfo <- function(
   )
   
   # Pre-compute values
-  mean_individual_complexity <- mean(individual_kcomplexity, na.rm = TRUE)
-  mean_population_complexity <- mean(population_kcomplexity, na.rm = TRUE)
+  mean_individual_complexity <- mean(
+    nvapply(kcomplexities, function(x){x["individual"]}), 
+    na.rm = TRUE
+  )
+  mean_population_complexity <- mean(
+    nvapply(kcomplexities, function(x){x["population"]}), 
+    na.rm = TRUE
+  )
   
   # Set up results
   results <- list(
     KComp = mean_individual_complexity,
     KComp.pop = mean_population_complexity,
-    EII = sqrt(dynega_objects$population$n.dim+1)^(
+    EII = sqrt(dynEGA.object$population$n.dim + 1)^(
       (mean_individual_complexity / mean_population_complexity) / log(edge_rows)
     )
   )
@@ -285,14 +237,16 @@ ergoInfo <- function(
   }
   
   # Add "methods" attribute
-  attr(results, "methods") <- list(use = use)
+  attr(results, "methods") <- list(use = use, shuffles = shuffles)
   
   # Add class
   class(results) <- "EII"
   
+  # Restore user's "scipen" option
+  options(scipen = user_scipen)
+  
   # Return results
   return(results)
-  
   
 }
 
@@ -312,19 +266,22 @@ ergoInfo <- function(
 
 #' @exportS3Method 
 # S3 Print Method
-# Updated 16.10.2023
+# Updated 12.11.2023
 print.EII <- function(x, ...)
 {
   
   # Print EII method
   cat(
-    "EII Method: ",
-    switch(
-      attr(x, "methods")$use,
-      "edge.list" = "Edge List",
-      "unweighted" = "Unweighted",
-      "weighted" = "Weighted"
-    ), "\n"
+    paste0(
+      "EII Method: ",
+      switch(
+        attr(x, "methods")$use,
+        "edge.list" = "Edge List",
+        "unweighted" = "Unweighted",
+        "weighted" = "Weighted"
+      ), "\n",
+      "Shuffles: ", attr(x, "methods")$shuffles, "\n"
+    )
   )
   
   # Print EII value
@@ -342,74 +299,19 @@ summary.EII <- function(object, ...)
 
 #' @noRd
 # k-complexity ----
-# Updated 20.07.2023
-k_complexity <- function(values, ordering)
+# Updated 12.11.2023
+k_complexity <- function(values)
 {
   
   # Streamlined form
-  if(ordering == "row"){
-    return(
-      length( # length of compression
-        memCompress( # bit compression
-          paste0( # bits (matches `toString`)
-            t(values), collapse = ", "
-          ), type = "gzip" # type of compression
-        )
+  return(
+    length( # length of compression
+      memCompress( # bit compression
+        paste0( # bits (matches `toString`)
+          values, collapse = ", "
+        ), type = "gzip" # type of compression
       )
     )
-  }else if(ordering == "column"){
-    return(
-      length( # length of compression
-        memCompress( # bit compression
-          paste0( # bits (matches `toString`)
-            values, collapse = ", "
-          ), type = "gzip" # type of compression
-        )
-      )
-    )
-  }
-  
-  # A key question on order of edge list:
-  # Should edges be in order of their pairwise correspondence; for example:
-  #
-  # 1 2
-  # 3 5
-  # 4 5
-  # 5 6
-  #
-  # Reads: "1, 2, 3, 5, 4, 5, 5, 6"
-  #
-  # OR
-  #
-  # Reads (current implementation): "1, 3, 4, 5, 2, 5, 5, 6"
+  )
   
 }
-
-#' @noRd
-# Structural edge overlap ----
-# EXPERIMENTAL -- NOT FINISHED
-# Updated 10.07.2023
-structural_overlap <- function(adjacency_networks)
-{
-  
-  # Convert to numeric
-  numeric_adjacency <- lapply(adjacency_networks, function(x){x * 1})
-  
-  # Get edge overlap (defined as "o")
-  edge_overlap <- symmetric_matrix_lapply(numeric_adjacency, sum)
-  
-  # Number of layers (defined as "M")
-  layers <- length(adjacency_networks)
-  
-  # Get copy of edge overlap
-  M_edge_overlap <- edge_overlap
-  
-  # Set non-zero values to 1 (defined as "Heaviside o")
-  M_edge_overlap[M_edge_overlap != 0] <- 1
-  
-  # Return structural overlap
-  (layers / (layers - 1)) *
-    ((edge_overlap / (layers * M_edge_overlap)) - (1 / layers))
-  
-}
-
