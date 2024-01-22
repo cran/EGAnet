@@ -2778,6 +2778,20 @@ pcor2inv <- function(partial_correlations)
 #%%%%%%%%%%%%%%%%%%%%%%%%
 
 #' @noRd
+# Re-index memberships ----
+# Updated 19.11.2023
+reindex_memberships <- function(memberships)
+{
+  
+  # Re-index back into same vector
+  memberships[] <- as.numeric(factor(memberships, unique(memberships)))
+  
+  # Return memberships
+  return(memberships)
+  
+}
+
+#' @noRd
 # Create sparse network ----
 # Updated 08.11.2023
 sparse_network <- function(network)
@@ -3193,24 +3207,26 @@ adapt.a <- function (test = c("anova","chisq","cor","one.sample","two.sample","p
 
 #' @noRd
 # OS and System Check ----
-# Updated 08.09.2020
-system.check <- function (...)
+# Updated 28.11.2023
+system.check <- function()
 {
+
+  # Get OS usage
   OS <- unname(tolower(Sys.info()["sysname"]))
   
+  # Get RStudio usage
   RSTUDIO <- swiftelse(Sys.getenv("RSTUDIO") == "1", TRUE, FALSE)
   
-  TEXT <- TRUE
+  # Return list
+  return(
+    list(
+      OS = OS,
+      R = paste0(R.version$major, ".", R.version$minor),
+      RSTUDIO = RSTUDIO,
+      TEXT = swiftelse(!RSTUDIO & OS != "linux", FALSE, TRUE)
+    )
+  )
   
-  if(!RSTUDIO){if(OS != "linux"){TEXT <- FALSE}}
-  
-  res <- list()
-  
-  res$OS <- OS
-  res$RSTUDIO <- RSTUDIO
-  res$TEXT <- TEXT
-  
-  return(res)
 }
 
 #' @noRd
