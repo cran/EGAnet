@@ -8,7 +8,7 @@
 #' @param data Matrix or data frame.
 #' Should consist only of variables to be used in the analysis
 #'
-#' @param groups Numeric or character vector (length = \code{ncol(data)}).
+#' @param groups Numeric or character vector (length = \code{nrow(data)}).
 #' Group membership corresponding to each case in data
 #'
 #' @param structure Numeric or character vector (length = \code{ncol(data)}).
@@ -291,7 +291,7 @@
 #' @export
 #'
 # Measurement Invariance
-# Updated 09.03.2024
+# Updated 10.04.2024
 invariance <- function(
     # `invariance` arguments
     data, groups, structure = NULL,
@@ -787,7 +787,7 @@ group_setup <- function(
 
 #' @exportS3Method
 # S3 Plot Method ----
-# Updated 08.10.2023
+# Updated 01.04.2024
 plot.invariance <- function(x, p_type = c("p", "p_BH"), p_value = 0.05, ...)
 {
 
@@ -851,10 +851,6 @@ plot.invariance <- function(x, p_type = c("p", "p_BH"), p_value = 0.05, ...)
     )
   )
 
-  # Update `alpha` guide
-  first_group$guides$colour$override.aes$alpha <- 0.25
-  second_group$guides$colour$override.aes$alpha <- 0.75
-
   # Set up p-value title
   if(p_type == "p") {
     invariant_title <- bquote(
@@ -872,14 +868,29 @@ plot.invariance <- function(x, p_type = c("p", "p_BH"), p_value = 0.05, ...)
     )
   }
 
-  # Update `title` guide
-  first_group$guides$colour$title <- invariant_title
-
-  second_group$guides$colour$title <- noninvariant_title
-
-  # Update `title.position` guide
-  first_group$guides$colour$title.position <- "top"
-  second_group$guides$colour$title.position <- "top"
+  # Update legend guide
+  first_group <- first_group +
+    ggplot2::guides(
+      colour = ggplot2::guide_legend(
+        title = invariant_title,
+        title.position = "top",
+        override.aes = list(
+          alpha = 0.25, size = second_ARGS$node.size,
+          stroke = 1.5
+        )
+      )
+    )
+  second_group <- second_group +
+    ggplot2::guides(
+      colour = ggplot2::guide_legend(
+        title = noninvariant_title,
+        title.position = "top",
+        override.aes = list(
+          alpha = 0.75, size = second_ARGS$node.size,
+          stroke = 1.5
+        )
+      )
+    )
 
   # Adjust size and position
   first_group <- first_group +
@@ -904,7 +915,7 @@ plot.invariance <- function(x, p_type = c("p", "p_BH"), p_value = 0.05, ...)
 
 #' @noRd
 # Configural invariance ----
-# Updated 03.08.2023
+# Updated 13.04.2024
 configural <- function(
     data, iter, structure, configural.threshold,
     configural.type, corr, na.data, model,
@@ -926,17 +937,15 @@ configural <- function(
       uni.method = uni.method, iter = iter,
       type = configural.type, ncores = ncores,
       EGA.type = "EGA", typicalStructure = FALSE,
+      plot.itemStability = FALSE,
       plot.typicalStructure = FALSE,
       seed = seed, verbose = verbose,
       clear = TRUE, suppress = TRUE, # additional internal arguments to `bootEGA`
       ...
     )
 
-    # Perform itemStability
-    item_stability <- itemStability(boot, IS.plot = FALSE, structure = structure)
-
-    # Stable items
-    stable_items <- item_stability$item.stability$empirical.dimensions >= configural.threshold
+    # Get stable items
+    stable_items <- boot$stability$item.stability$item.stability$empirical.dimensions >= configural.threshold
 
     # Perform checks
     stability <- all(stable_items)
@@ -955,7 +964,7 @@ configural <- function(
       data = data,
       stable_items = stable_items,
       boot_object = boot,
-      item_stability = item_stability,
+      item_stability = boot$stability$item.stability,
       configural_flag = items > 0
     )
   )

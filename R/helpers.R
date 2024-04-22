@@ -1448,7 +1448,7 @@ needs_usable <- function(ellipse)
 #' @noRd
 # Obtain data, sample size, correlation matrix ----
 # Generic function to get the usual needed inputs
-# Updated 04.09.2023
+# Updated 16.03.2024
 obtain_sample_correlations <- function(data, n, corr, na.data, verbose, ...)
 {
 
@@ -1501,7 +1501,13 @@ obtain_sample_correlations <- function(data, n, corr, na.data, verbose, ...)
       )
 
     }else{
-      correlation_matrix <- cor(data, use = na.data, method = corr)
+      correlation_matrix <- cor(
+        data, use = swiftelse(
+          na.data == "pairwise",
+          "pairwise.complete.obs",
+          "complete.obs"
+        ), method = corr
+      )
     }
 
   }
@@ -2864,21 +2870,19 @@ pcor2inv <- function(partial_correlations)
 
 #' @noRd
 # Continuous Accuracy (for single variable) ----
-# Updated 12.02.2024
+# Updated 26.03.2024
 continuous_accuracy <- function(prediction, observed)
 {
 
-  # Compute square error
-  square_error <- (prediction - observed)^2
+  # No intercept for prediction
+  # sum((observed - mean(observed, na.rm = TRUE))^2, na.rm = TRUE)
+  # A great explanation on why not: https://stats.stackexchange.com/questions/26176/removal-of-statistically-significant-intercept-term-increases-r2-in-linear-mo
 
   # Return accuracies
   return(
     c(
-      R2 = 1 - (
-        sum(square_error, na.rm = TRUE) /
-        sum((observed - mean(observed, na.rm = TRUE))^2, na.rm = TRUE)
-      ),
-      RMSE = sqrt(mean(square_error, na.rm = TRUE))
+      R2 = cor(prediction, observed, use = "pairwise")^2,
+      RMSE = sqrt(mean((prediction - observed)^2, na.rm = TRUE))
     )
   )
 
