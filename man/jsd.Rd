@@ -4,7 +4,7 @@
 \alias{jsd}
 \title{Jensen-Shannon Distance}
 \usage{
-jsd(network1, network2, method = c("kld", "spectral"))
+jsd(network1, network2, method = c("kld", "spectral"), signed = TRUE)
 }
 \arguments{
 \item{network1}{Matrix or data frame.
@@ -26,6 +26,10 @@ Available options:
 Von Neumann entropy
 
 }}
+
+\item{signed}{Boolean. (length = 1).
+Should networks be remain signed?
+Defaults to \code{TRUE}}
 }
 \value{
 Returns Jensen-Shannon Distance
@@ -54,16 +58,16 @@ data2 <- wmt[split2,]
 glas1 <- EBICglasso.qgraph(data1)
 glas2 <- EBICglasso.qgraph(data2)
 
-# Spectral JSD 
-jsd(glas1, glas2) 
+# Spectral JSD
+jsd(glas1, glas2)
 # 0.1595893
 
 # Spectral JSS (similarity)
-1 - jsd(glas1, glas2) 
+1 - jsd(glas1, glas2)
 # 0.8404107
 
 # Jensen-Shannon Divergence
-jsd(glas1, glas2, method = "kld") 
+jsd(glas1, glas2, method = "kld")
 # 0.1393621
 
 }

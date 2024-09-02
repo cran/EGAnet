@@ -93,7 +93,7 @@
 #' }
 #'
 #' @param algorithm Character or
-#' \code{\link{igraph}} \code{cluster_*} function (length = 1).
+#' \code{} \code{cluster_*} function (length = 1).
 #' Defaults to \code{"walktrap"}.
 #' Three options are listed below but all are available
 #' (see \code{\link[EGAnet]{community.detection}} for other options):
@@ -154,7 +154,7 @@
 #' Defaults to \code{NULL} or random results.
 #' Set for reproducible results.
 #' See \href{https://github.com/hfgolino/EGAnet/wiki/Reproducibility-and-PRNG}{Reproducibility and PRNG}
-#' for more details on random number generation in \code{\link{EGAnet}}
+#' for more details on random number generation in \code{}
 #'
 #' @param verbose Boolean (length = 1).
 #' Should progress be displayed?
@@ -210,11 +210,29 @@
 #'
 #' \strong{Three or More Groups}
 #'
-#' At this time, only two groups are supported. There is a method proposed to
-#' test three or more groups in Jamison, Golino, and Christensen (2023) but
-#' this approach has not been thoroughly vetted and validated. Future versions
-#' of the package will provide support for three or more groups once there is
-#' an established consensus for best practice.
+#' When there are 3 or more groups, the function performs metric invariance testing by comparing
+#' all possible pairs of groups. Specifically:
+#'
+#' \itemize{
+#'
+#' \item \emph{Pairwise Comparisons}: The function generates all possible unique group pairings
+#' and computes the differences in network loadings for each pair. The same community structure,
+#' derived from configural invariance or provided by the user, is used for all groups.
+#'
+#' \item \emph{Permutation Testing}: For each group pair, permutation tests are conducted to
+#' assess the statistical significance of the observed differences in loadings. \emph{p}-values are
+#' calculated based on the proportion of permuted differences that are greater than or equal to
+#' the observed difference.
+#'
+#' \item \emph{Result Compilation}: The function compiles the results for each pair including
+#' both uncorrected (\code{p}) and FDR-corrected (Benjamini-Hochberg; \code{p_BH}) \emph{p}-values,
+#' and the direction of differences. It returns a summary of the findings for all pairwise comparisons.
+#'
+#' }
+#'
+#' This approach allows for a detailed examination of metric invariance across multiple groups,
+#' ensuring that all potential differences are thoroughly assessed while maintaining the ability
+#' to identify specific group differences.
 #'
 #' For more details, see Jamison, Golino, and Christensen (2023)
 #'
@@ -265,9 +283,9 @@
 #'
 #' @references
 #' \strong{Original implementation} \cr
-#' Jamison, L., Golino, H., & Christensen, A. P. (2023).
+#' Jamison, L., Christensen, A. P., & Golino, H. F. (2024).
 #' Metric invariance in exploratory graph analysis via permutation testing.
-#' \emph{PsyArXiv}.
+#' \emph{Methodology}, \emph{20}(2), 144-186.
 #'
 #' @examples
 #' # Load data
@@ -286,18 +304,16 @@
 #' # Plot with BH-corrected alpha = 0.10
 #' plot(results, p_type = "p_BH", p_value = 0.10)}
 #'
-#' @seealso \code{\link[EGAnet]{plot.EGAnet}} for plot usage in \code{\link{EGAnet}}
+#' @seealso \code{\link[EGAnet]{plot.EGAnet}} for plot usage in \code{}
 #'
 #' @export
 #'
 # Measurement Invariance
-# Updated 10.04.2024
+# Updated 13.08.2024
 invariance <- function(
-    # `invariance` arguments
     data, groups, structure = NULL,
     iter = 500, configural.threshold = 0.70,
     configural.type = c("parametric", "resampling"),
-    # standard arguments
     corr = c("auto", "cor_auto", "pearson", "spearman"),
     na.data = c("pairwise", "listwise"),
     model = c("BGGM", "glasso", "TMFG"),
@@ -311,7 +327,7 @@ invariance <- function(
   # Store random state (if there is one)
   store_state()
 
-  # Check for missing arguments (argument, default, function)
+  # Check for missing arguments
   configural.type <- set_default(configural.type, "parametric", invariance)
   corr <- set_default(corr, "auto", invariance)
   na.data <- set_default(na.data, "pairwise", auto.correlate)
@@ -329,54 +345,23 @@ invariance <- function(
   # Get data and groups
   data <- error_return$data; groups <- error_return$groups
 
-  # Ensure data has variable names
+  # Ensure data has variable names and get dimensions
   data <- ensure_dimension_names(data)
+  dimensions <- dim(data)
+  dimension_names <- dimnames(data)
 
-  # Get dimensions and dimension names of the data
-  original_dimensions <- dim(data)
-  original_dimension_names <- dimnames(data)
+  # Get unique groups (factored)
+  unique_factors <- na.omit(unique(groups))
 
-  # Get ellipse arguments
-  ellipse <- list(...)
+  # Set groups as factors
+  groups <- as.numeric(factor(groups, levels = unique_factors))
 
-  # Check for seed
-  if(is.null(seed)){ # Send message about seed
-    message("Argument 'seed' is set to `NULL`. Results will not be reproducible. Set 'seed' for reproducible results\n")
-  }
-
-  # Check for legacy argument 'memberships
-  if("memberships" %in% names(ellipse)){
-    structure <- ellipse$memberships
-  }
-
-  # Get unique groups
+  # Get unique groups (numeric)
   unique_groups <- na.omit(unique(groups))
 
-  # Send warning about only two groups (for now)
-  if(length(unique_groups) > 2){
-
-    # Send warning
-    warning(
-      "More than two groups is not yet supported. Using the first two groups...",
-      call. = FALSE
-    )
-
-    # Update unique groups
-    unique_groups <- unique_groups[c(1L, 2L)]
-
-    # Keep indices
-    keep_index <- groups %in% unique_groups
-
-    # Update groups
-    groups <- groups[keep_index]
-
-    # Update data
-    data <- data[keep_index,]
-
-    # Update data dimensions
-    dimensions <- dim(data)
-
-  }
+  # Generate all possible group pairings
+  group_pairs <- combn(unique_groups, 2, simplify = FALSE)
+  pairs_length <- length(group_pairs)
 
   # If structure is supplied, then skip configural invariance
   if(is.null(structure)){
@@ -416,84 +401,75 @@ invariance <- function(
     # Update data
     data <- configural_results$data
 
+    # Update dimension names
+    dimension_names <- dimnames(data)
+
     # Update original EGA
     original_EGA <- configural_results$boot_object$EGA
 
-    # Set structure based on original `EGA`
+    # Set structure based on original EGA
     structure <- original_EGA$wc
 
   }else{
 
-    # Remove attributes
+    # Process structure if supplied
     structure <- remove_attributes(structure)
-
-    # If not `NULL`, then check for error in object type
-    object_error(structure, c("vector", "matrix", "data.frame"), "invariance")
-
-    # Make sure 'structure' is a vector
     structure <- force_vector(structure)
-
-    # Make sure 'structure' has names
-    names(structure) <- original_dimension_names[[2]]
+    names(structure) <- dimension_names[[2]]
 
   }
-
-  # Send message about continuing on with metric invariance
-  message("Testing metric invariance...")
-
-  # Update dimensions and dimension names of the data
-  dimensions <- dim(data)
-  dimension_names <- dimnames(data)
 
   # Get community names
   community_names <- as.character(unique(structure))
 
-  # Obtain original group EGAs
-  group_ega <- lapply(unique_groups, function(group){
+  # Send message about continuing on with metric invariance
+  message("Testing metric invariance...")
 
-    # Return `EGA`
+  # Perform EGA for all groups
+  group_ega <- lapply(unique_groups, function(group){
     EGA(
       data = data[groups == group,],
       corr = corr, model = model,
       algorithm = algorithm, uni.method = uni.method,
       plot.EGA = FALSE, ...
     )
+  }); names(group_ega) <- unique_factors # add names
 
-  })
-
-  # Rename list
-  names(group_ega) <- unique_groups
-
-  # Original network loadings
+  # Calculate loadings for all groups
   group_loadings <- lapply(group_ega, function(x){
-
-    # Obtain loadings
     loadings <- as.matrix(
       net.loads(A = x$network, wc = structure, ...)$std
     )
-
-    # Reorder and return loadings
     return(loadings[dimension_names[[2]], community_names, drop = FALSE])
-
   })
-
-  # Original difference
-  original_difference <- group_loadings[[1]] - group_loadings[[2]]
-
-  # Obtain original assigned difference
-  original_assigned_difference <- ulapply(
-    community_names, function(community){
-      original_difference[structure == community, community]
-    }
-  )
-
-  # Ensure same order as original data
-  original_assigned_difference <- original_assigned_difference[dimension_names[[2]]]
 
   # Get seeds
   seeds <- reproducible_seeds(iter, seed)
 
-  # Permutate groups
+  # Get pairwise differences
+  original_differences <- lapply(group_pairs, function(pair){
+
+    # Original difference
+    original_difference <- group_loadings[[pair[1]]] -
+      group_loadings[[pair[2]]]
+
+    # Obtain original assigned difference
+    original_assigned_difference <- ulapply(
+      community_names, function(community){
+        original_difference[structure == community, community]
+      }
+    )
+
+    # Ensure same order as original data
+    return(original_assigned_difference[dimension_names[[2]]])
+
+  }); names(original_differences) <- lapply(
+    group_pairs, function(x){
+      paste0(unique_factors[x[1]], "-", unique_factors[x[2]])
+    }
+  )
+
+  # Permutate groups for this pair
   perm_groups <- lapply(
     seeds, function(seed_value){
       shuffle(groups, seed = seed_value)
@@ -543,88 +519,95 @@ invariance <- function(
   )
 
   # Compute differences (ensure same ordering)
-  difference_list <- lapply(permutated_loadings, function(x){
-    x[[1]][dimension_names[[2]], community_names, drop = FALSE] -
-      x[[2]][dimension_names[[2]], community_names, drop = FALSE]
-  })
+  difference_list <- lapply(group_pairs, function(pair){
 
-  # Obtain assigned loadings only
-  assigned_list <- lapply(difference_list, function(one_difference){
+    # Loop over permutations
+    permutated_differences <- lapply(permutated_loadings, function(x){
 
-    # Get differences
-    differences <- ulapply(
-      community_names, function(community){
-        one_difference[structure == community, community]
-      }
-    )
+      x[[pair[1]]][dimension_names[[2]], community_names, drop = FALSE] -
+      x[[pair[2]]][dimension_names[[2]], community_names, drop = FALSE]
+
+    })
+
+    # Obtain assigned loadings only
+    assigned_list <- lapply(permutated_differences, function(one_difference){
+      differences <- ulapply(
+        community_names, function(community){
+          one_difference[structure == community, community]
+        }
+      )
+      return(differences[dimension_names[[2]]])
+    })
 
     # Ensure same order as original data
-    return(differences[dimension_names[[2]]])
+    return(do.call(cbind, assigned_list))
 
-  })
+  }); names(difference_list) <- names(original_differences)
 
-  # Create results
-  permutation_counts <- lapply(assigned_list, function(x){
-    abs(x) >= abs(original_assigned_difference)
-  })
+  # Set up pairwise results
+  results_list <- lapply(seq_len(pairs_length), function(i){
 
-  # Replace the first permutation with all TRUE (original differences)
-  permutation_counts[[1]] <- rep(TRUE, dimensions[2])
+    # Replace the first permutation with all TRUE (original differences)
+    permutation_counts <- cbind(
+      TRUE, abs(difference_list[[i]]) >= abs(original_differences[[i]])
+    )[,-2]
 
-  # Compute p-values
-  p_value <- rowMeans(
-    do.call(cbind, permutation_counts), na.rm = TRUE
-  )
+    # Compute p-values
+    p_value <- rowMeans(permutation_counts, na.rm = TRUE)
 
-  # Results data frame
-  results_df <- data.frame(
-    Membership = remove_attributes(structure),
-    Difference = round(original_assigned_difference, 3),
-    p = round(p_value, 3),
-    p_BH = round(p.adjust(p_value, method = "BH"), 3)
-  )
+    # Results data frame
+    results_df <- data.frame(
+      Membership = remove_attributes(structure),
+      Difference = round(original_differences[[i]], 3),
+      p = round(p_value, 3),
+      p_BH = round(p.adjust(p_value, method = "BH"), 3)
+    )
 
-  # Order by dimension
-  results_df <- results_df[order(results_df$Membership),]
+    # Order by dimension
+    results_df <- results_df[order(results_df$Membership),]
 
-  # Add significance
-  sig <- swiftelse(results_df$p <= 0.10, ".", "")
-  sig <- swiftelse(results_df$p <= 0.05, "*", sig)
-  sig <- swiftelse(results_df$p <= 0.01, "**", sig)
-  results_df$sig <- swiftelse(results_df$p <= 0.001, "***", sig)
+    # Add significance
+    sig <- swiftelse(results_df$p <= 0.10, ".", "")
+    sig <- swiftelse(results_df$p <= 0.05, "*", sig)
+    sig <- swiftelse(results_df$p <= 0.01, "**", sig)
+    results_df$sig <- swiftelse(results_df$p <= 0.001, "***", sig)
 
-  # Add direction
-  direction <- paste(
-    unique_groups[1],
-    swiftelse(sign(results_df$Difference) == 1, ">", "<"),
-    unique_groups[2]
-  )
-  results_df$Direction <- swiftelse(results_df$p <= 0.05, direction, "")
+    # Add direction
+    direction <- paste(
+      unique_factors[group_pairs[[i]][1]],
+      swiftelse(sign(results_df$Difference) == 1, ">", "<"),
+      unique_factors[group_pairs[[i]][2]]
+    )
+    results_df$Direction <- swiftelse(results_df$p <= 0.05, direction, "")
+
+    # Return data frames
+    return(results_df)
+
+  }); names(results_list) <- names(original_differences)
 
   # Results list
   results <- list(
     configural.results = swiftelse(
       exists("configural_results"),
-      configural_results,
-      NULL
+      configural_results, NULL
     ),
     memberships = structure,
     EGA = swiftelse(
       exists("original_EGA"),
-      original_EGA,
-      NULL
+      original_EGA, NULL
     ),
     groups = list(
       EGA = group_ega,
       loadings = group_loadings,
-      loadingsDifference = original_assigned_difference
+      loadingsDifference = original_differences,
+      unique_groups = unique_factors
     ),
     permutation = list(
       groups = perm_groups,
       loadings = permutated_loadings,
-      loadingsDifference = assigned_list
+      loadingsDifference = difference_list
     ),
-    results = results_df
+    results = results_list
   )
 
   # Add class
@@ -701,21 +684,113 @@ invariance_errors <- function(
 
 #' @exportS3Method
 # S3 Print Method ----
-# Updated 10.07.2023
-print.invariance <- function(x, ...) {
+# Updated 13.08.2024
+# Updated print method
+print.invariance <- function(x, pairs = list(), ...)
+{
 
-  # Print results "as-is"
-  print(x$results)
-  cat("----\n") # Add breakspace and significance code
-  cat("Signif. code: 0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 'n.s.' 1")
+  # Print title
+  cat(styletext("Invariance Results", defaults = "bold"), "\n")
+
+  # Get number of possible pairs
+  total_pairs <- length(x$results)
+  pairs_sequence <- seq_len(total_pairs)
+
+  # Create combination of pairs
+  possible_pairs <- combn(names(x$groups$EGA), 2, simplify = FALSE)
+
+  # Check for pairs
+  input_pairs <- length(pairs) == 0
+
+  # Check for missing pairs
+  if(input_pairs){
+    pairs <- possible_pairs
+  }
+
+  # Match up pairs
+  combined <- do.call(rbind, c(pairs, possible_pairs))
+  pairs <- which(duplicated(combined)) - length(pairs)
+
+  # Loop over to print results
+  for(pair in pairs){
+
+    # Print groups
+    cat(
+      styletext(
+        paste(
+          "\nComparison:", gsub("-", " vs ", names(x$results)[pair])
+        ), defaults = "underline"
+      ), "\n"
+    )
+
+    # Print "as-is" results
+    print(x$results[[pair]])
+
+    # Add breakspace
+    cat("----\n")
+
+  }
+
+  # Print significance codes
+  cat("Signif. codes: 0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 'n.s.' 1\n\n")
+
+  # Let user know about print
+  if(input_pairs && total_pairs > 1){
+    cat("Use the argument 'pairs = list()' for individual paired results using `c()` inside `list()` (for multiple pairs, use `c()` inside `list()` for each pair).\n")
+  }
 
 }
 
 #' @exportS3Method
 # S3 Summary Method ----
-# Updated 10.07.2023
-summary.invariance <- function(object, ...) {
-  print(object, ...) # same as print
+# Updated 13.08.2024
+summary.invariance <- function(object, ...)
+{
+
+  # Print title
+  cat(styletext("Summary of Invariance Results", defaults = "bold"), "\n\n")
+
+  # Print descriptives
+  cat("Number of groups:", length(object$groups$EGA), "\n")
+  cat("Number of pairwise comparisons:", length(object$results), "\n\n")
+
+  # Loop over for p-value descriptives
+  for(pair in seq_along(object$results)){
+
+    # Print groups
+    cat(
+      styletext(
+        paste(
+          "\nComparison:", gsub("-", " vs ", names(object$results)[pair])
+        ), defaults = "underline"
+      ), "\n"
+    )
+
+    # Print noninvariant items
+    cat(
+      "Number of noninvariant items (p < 0.05):",
+      sum(object$results[[pair]]$p < 0.05),
+      paste0(
+        "(",
+        format_decimal(mean(object$results[[pair]]$p < 0.05) * 100, 1),
+        "%)\n"
+      )
+    )
+    cat(
+      "Number of noninvariant items (p_BH < 0.05):",
+      sum(object$results[[pair]]$p_BH < 0.05),
+      paste0(
+        "(",
+        format_decimal(mean(object$results[[pair]]$p_BH < 0.05) * 100, 1),
+        "%)\n\n"
+      )
+    )
+
+  }
+
+  # Let user know about print
+  cat("Use `print()` for more detailed results.\n")
+
 }
 
 #' @noRd
@@ -787,9 +862,12 @@ group_setup <- function(
 
 #' @exportS3Method
 # S3 Plot Method ----
-# Updated 01.04.2024
-plot.invariance <- function(x, p_type = c("p", "p_BH"), p_value = 0.05, ...)
+# Updated 13.08.2024
+plot.invariance <- function(x, pairs = list(), p_type = c("p", "p_BH"), p_value = 0.05, ...)
 {
+
+  # Obtain unique groups
+  unique_factors <- x$groups$unique_groups
 
   # Set default for p-value type
   p_type <- swiftelse(missing(p_type), "p", match.arg(p_type))
@@ -797,20 +875,78 @@ plot.invariance <- function(x, p_type = c("p", "p_BH"), p_value = 0.05, ...)
   # Check for appropriate p-value range
   range_error(p_value, c(0, 1), "plot.invariance")
 
+  # Get number of possible pairs
+  total_pairs <- length(x$results)
+  pairs_sequence <- seq_len(total_pairs)
+
+  # Create combination of pairs
+  possible_pairs <- combn(names(x$groups$EGA), 2, simplify = FALSE)
+
+  # Check for pairs
+  input_pairs <- length(pairs) == 0
+
+  # Check for missing pairs
+  if(input_pairs){
+    pairs <- possible_pairs
+  }else if(length(pairs) > 6){ # Don't do more than 6 comparisons (equivalent to 4 groups)
+
+    # Get first six comparisons
+    pairs <- pairs[1:6]
+
+    # Send warning message
+    warning(
+      paste(
+        "Due to the complexity of plotting more than 6 pairwise plots,",
+        "only the combinations involving the first six comparisons will be used:\n",
+        paste(
+          lapply(
+            pairs, function(x){
+              paste(unique_factors[x[1]], "vs", unique_factors[x[2]])
+            }
+          ), collapse = ", "
+        )
+      )
+    )
+
+  }
+
+  # Match up pairs
+  combined <- do.call(rbind, c(pairs, possible_pairs))
+  pair_index <- which(duplicated(combined)) - length(pairs)
+
+  # Get number of groups
+  group_names <- names(x$groups$EGA)
+  total_groups <- length(group_names)
+  group_sequence <- seq_len(total_groups)
+  total_pairs <- length(pair_index)
+
   # Ensure same memberships
-  x$groups$EGA[[1]]$wc <- x$memberships
-  x$groups$EGA[[2]]$wc <- x$memberships
+  x$groups$EGA <- lapply(group_sequence, function(i){
+
+    # Replace memberships with 'structure'
+    x$groups$EGA[[i]]$wc <- x$memberships
+
+    # Return entire object
+    return(x$groups$EGA[[i]])
+
+  }); names(x$groups$EGA) <- group_names
 
   # Obtain noninvariant items
-  noninvariant <- x$results[names(x$memberships), p_type] <= p_value
+  noninvariant <- lapply(x$results, function(result){
+    result[names(x$memberships), p_type] <= p_value
+  })
 
   # Get number of nodes
-  nodes <- length(noninvariant)
+  nodes <- length(noninvariant[[1]])
 
   # Set up first group plot
   first_group <- basic_plot_setup(
-    network = x$groups$EGA[[1]]$network,
-    wc = x$groups$EGA[[1]]$wc,  ...,
+    network = x$groups$EGA[[
+      possible_pairs[[pair_index[1]]][1]
+    ]]$network,
+    wc = x$groups$EGA[[
+      possible_pairs[[pair_index[1]]][1]
+    ]]$wc,  ...,
     arguments = TRUE
   )
 
@@ -822,37 +958,10 @@ plot.invariance <- function(x, p_type = c("p", "p_BH"), p_value = 0.05, ...)
   second_ARGS[c(
     "net", "edge.alpha", "edge.color", "edge.lty", "edge.size"
   )] <- NULL
-
-  # Add network and memberships
-  second_ARGS$network <- x$groups$EGA[[2]]$network
-  second_ARGS$wc <- x$groups$EGA[[2]]$wc
-  second_ARGS$arguments <- TRUE
-
-  # Set up second group plot
-  second_group <- do.call(basic_plot_setup, second_ARGS)
-
-  # Get updated plots for each group
-  ## First group
-  first_group <- do.call(
-    what = basic_plot_setup,
-    args = group_setup(
-      EGA_object = x$groups$EGA[[1]],
-      plot_ARGS = first_group$ARGS,
-      nodes = nodes, noninvariant = noninvariant
-    )
-  )
-  ## Second group
-  second_group <- do.call(
-    what = basic_plot_setup,
-    args = group_setup(
-      EGA_object = x$groups$EGA[[2]],
-      plot_ARGS = second_group$ARGS,
-      nodes = nodes, noninvariant = noninvariant
-    )
-  )
+  first_ARGS <- second_ARGS
 
   # Set up p-value title
-  if(p_type == "p") {
+  if(p_type == "p"){
     invariant_title <- bquote(
       paste("Invariant (", italic(p), " > ", .(p_value), ")")
     )
@@ -868,48 +977,288 @@ plot.invariance <- function(x, p_type = c("p", "p_BH"), p_value = 0.05, ...)
     )
   }
 
-  # Update legend guide
-  first_group <- first_group +
-    ggplot2::guides(
-      colour = ggplot2::guide_legend(
-        title = invariant_title,
-        title.position = "top",
-        override.aes = list(
-          alpha = 0.25, size = second_ARGS$node.size,
-          stroke = 1.5
-        )
-      )
-    )
-  second_group <- second_group +
-    ggplot2::guides(
-      colour = ggplot2::guide_legend(
-        title = noninvariant_title,
-        title.position = "top",
-        override.aes = list(
-          alpha = 0.75, size = second_ARGS$node.size,
-          stroke = 1.5
-        )
-      )
-    )
-
-  # Adjust size and position
-  first_group <- first_group +
-    ggplot2::theme(
-      legend.title = ggplot2::element_text(size = 12, hjust = 0.5)
-    )
-  second_group <- second_group +
-    ggplot2::theme(
-      legend.title = ggplot2::element_text(size = 12, hjust = 0.5)
-    )
-
-  # Arrange plots
-  ggpubr::ggarrange(
-    first_group, second_group,
-    ncol = 2, nrow = 1,
-    labels = names(x$groups$EGA),
-    legend = "bottom",
-    common.legend = FALSE
+  # Determine best final arrangement
+  rows <- switch(
+    as.character(total_pairs),
+    "1" = 1, "2" = 2, "3" = 3,
+    "4" = 2, "5" = 3, "6" = 3
   )
+  columns <- switch(
+    as.character(total_pairs),
+    "1" = 1, "2" = 1, "3" = 1,
+    "4" = 2, "5" = 2, "6" = 2
+  )
+
+  # Set up for first indices
+  first_indices <- seq_len(rows)
+
+  # Set up pairwise plots
+  pairwise_plots <- lapply(first_indices, function(index){
+
+    # Add network and memberships
+    first_ARGS$network <- x$groups$EGA[[
+      possible_pairs[[pair_index[[index]]]][1]
+    ]]$network
+    first_ARGS$wc <- x$groups$EGA[[
+      possible_pairs[[pair_index[[index]]]][1]
+    ]]$wc
+    first_ARGS$arguments <- TRUE
+    second_ARGS$network <- x$groups$EGA[[
+      possible_pairs[[pair_index[[index]]]][2]
+    ]]$network
+    second_ARGS$wc <- x$groups$EGA[[
+      possible_pairs[[pair_index[[index]]]][2]
+    ]]$wc
+    second_ARGS$arguments <- TRUE
+
+    # Set up group plots
+    first_group <- do.call(basic_plot_setup, first_ARGS)
+    second_group <- do.call(basic_plot_setup, second_ARGS)
+
+    # Get updated plots for each group
+    ## First group
+    first_group <- do.call(
+      what = basic_plot_setup,
+      args = group_setup(
+        EGA_object = x$groups$EGA[[
+          possible_pairs[[pair_index[[index]]]][1]
+        ]],
+        plot_ARGS = first_group$ARGS,
+        nodes = nodes, noninvariant = noninvariant[[pair_index[[index]]]]
+      )
+    )
+    ## Second group
+    second_group <- do.call(
+      what = basic_plot_setup,
+      args = group_setup(
+        EGA_object = x$groups$EGA[[
+          possible_pairs[[pair_index[[index]]]][2]
+        ]],
+        plot_ARGS = second_group$ARGS,
+        nodes = nodes, noninvariant = noninvariant[[pair_index[[index]]]]
+      )
+    )
+
+    # Check for last group
+    if(index == rows){
+
+      # Update legend guide
+      first_group <- first_group +
+        ggplot2::guides(
+          colour = ggplot2::guide_legend(
+            title = invariant_title,
+            title.position = "top",
+            override.aes = list(
+              alpha = 0.25, size = second_ARGS$node.size,
+              stroke = 1.5
+            )
+          )
+        )
+      second_group <- second_group +
+        ggplot2::guides(
+          colour = ggplot2::guide_legend(
+            title = noninvariant_title,
+            title.position = "top",
+            override.aes = list(
+              alpha = 0.75, size = second_ARGS$node.size,
+              stroke = 1.5
+            )
+          )
+        )
+
+      # Adjust size and position
+      first_group <- first_group +
+        ggplot2::theme(
+          legend.title = ggplot2::element_text(size = 12, hjust = 0.5)
+        )
+      second_group <- second_group +
+        ggplot2::theme(
+          legend.title = ggplot2::element_text(size = 12, hjust = 0.5)
+        )
+
+      # Return plot
+      return(
+        ggpubr::ggarrange(
+          first_group, second_group,
+          ncol = 2, nrow = 1,
+          labels = possible_pairs[[pair_index[[index]]]],
+          legend = "bottom",
+          common.legend = FALSE
+        )
+      )
+
+    }else{
+
+      # Remove legends
+      first_group <- first_group + ggplot2::theme(
+        legend.position = "none"
+      )
+      second_group <- second_group + ggplot2::theme(
+        legend.position = "none"
+      )
+
+      # Return plot
+      return(
+        ggpubr::ggarrange(
+          first_group, second_group,
+          ncol = 2, nrow = 1,
+          labels = possible_pairs[[pair_index[[index]]]],
+          legend = "none"
+        )
+      )
+
+    }
+
+  })
+
+  # Arrange final plots
+  final_plots <- ggpubr::ggarrange(
+    plotlist = pairwise_plots,
+    ncol = 1, nrow = rows
+  )
+
+  # Check for more
+  if(total_pairs > 3){
+
+    # Set up for second indices
+    second_indices <- (rows + 1):total_pairs
+
+    # Set up pairwise plots
+    pairwise_plots <- lapply(second_indices, function(index){
+
+      # Add network and memberships
+      first_ARGS$network <- x$groups$EGA[[
+        possible_pairs[[pair_index[[index]]]][1]
+      ]]$network
+      first_ARGS$wc <- x$groups$EGA[[
+        possible_pairs[[pair_index[[index]]]][1]
+      ]]$wc
+      first_ARGS$arguments <- TRUE
+      second_ARGS$network <- x$groups$EGA[[
+        possible_pairs[[pair_index[[index]]]][2]
+      ]]$network
+      second_ARGS$wc <- x$groups$EGA[[
+        possible_pairs[[pair_index[[index]]]][2]
+      ]]$wc
+      second_ARGS$arguments <- TRUE
+
+      # Set up group plots
+      first_group <- do.call(basic_plot_setup, first_ARGS)
+      second_group <- do.call(basic_plot_setup, second_ARGS)
+
+      # Get updated plots for each group
+      ## First group
+      first_group <- do.call(
+        what = basic_plot_setup,
+        args = group_setup(
+          EGA_object = x$groups$EGA[[
+            possible_pairs[[pair_index[[index]]]][1]
+          ]],
+          plot_ARGS = first_group$ARGS,
+          nodes = nodes, noninvariant = noninvariant[[pair_index[[index]]]]
+        )
+      )
+      ## Second group
+      second_group <- do.call(
+        what = basic_plot_setup,
+        args = group_setup(
+          EGA_object = x$groups$EGA[[
+            possible_pairs[[pair_index[[index]]]][2]
+          ]],
+          plot_ARGS = second_group$ARGS,
+          nodes = nodes, noninvariant = noninvariant[[pair_index[[index]]]]
+        )
+      )
+
+      # Check for last group
+      if(index == total_pairs){
+
+        # Update legend guide
+        first_group <- first_group +
+          ggplot2::guides(
+            colour = ggplot2::guide_legend(
+              title = invariant_title,
+              title.position = "top",
+              override.aes = list(
+                alpha = 0.25, size = second_ARGS$node.size,
+                stroke = 1.5
+              )
+            )
+          )
+        second_group <- second_group +
+          ggplot2::guides(
+            colour = ggplot2::guide_legend(
+              title = noninvariant_title,
+              title.position = "top",
+              override.aes = list(
+                alpha = 0.75, size = second_ARGS$node.size,
+                stroke = 1.5
+              )
+            )
+          )
+
+        # Adjust size and position
+        first_group <- first_group +
+          ggplot2::theme(
+            legend.title = ggplot2::element_text(size = 12, hjust = 0.5)
+          )
+        second_group <- second_group +
+          ggplot2::theme(
+            legend.title = ggplot2::element_text(size = 12, hjust = 0.5)
+          )
+
+        # Return plot
+        return(
+          ggpubr::ggarrange(
+            first_group, second_group,
+            ncol = 2, nrow = 1,
+            labels = possible_pairs[[pair_index[[index]]]],
+            legend = "bottom",
+            common.legend = FALSE
+          )
+        )
+
+      }else{
+
+        # Remove legends
+        first_group <- first_group + ggplot2::theme(
+          legend.position = "none"
+        )
+        second_group <- second_group + ggplot2::theme(
+          legend.position = "none"
+        )
+
+        # Return plot
+        return(
+          ggpubr::ggarrange(
+            first_group, second_group,
+            ncol = 2, nrow = 1,
+            labels = possible_pairs[[pair_index[[index]]]],
+            legend = "none"
+          )
+        )
+
+      }
+
+    })
+
+    # Arrange final plots
+    final_plots <- ggpubr::ggarrange(
+      final_plots, ggpubr::ggarrange(
+        plotlist = pairwise_plots,
+        ncol = 1, nrow = rows
+      ), ncol = columns, nrow = 1
+    )
+
+  }
+
+  # Let user know about plot
+  if(input_pairs && total_pairs > 1){
+    cat("Use the argument 'pairs = list()' for individual paired results using `c()` inside `list()` (for multiple pairs, use `c()` inside `list()` for each pair).\n")
+  }
+
+  # Return final plots
+  return(final_plots)
 
 }
 
@@ -970,4 +1319,5 @@ configural <- function(
   )
 
 }
+
 

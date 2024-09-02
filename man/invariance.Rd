@@ -111,7 +111,7 @@ See \code{\link[EGAnet]{TMFG}} for more details
 }}
 
 \item{algorithm}{Character or
-\code{\link{igraph}} \code{cluster_*} function (length = 1).
+\code{} \code{cluster_*} function (length = 1).
 Defaults to \code{"walktrap"}.
 Three options are listed below but all are available
 (see \code{\link[EGAnet]{community.detection}} for other options):
@@ -172,7 +172,7 @@ then type: \code{parallel::detectCores()}}
 Defaults to \code{NULL} or random results.
 Set for reproducible results.
 See \href{https://github.com/hfgolino/EGAnet/wiki/Reproducibility-and-PRNG}{Reproducibility and PRNG}
-for more details on random number generation in \code{\link{EGAnet}}}
+for more details on random number generation in \code{}}
 
 \item{verbose}{Boolean (length = 1).
 Should progress be displayed?
@@ -277,11 +277,29 @@ are flagged for significance along with the direction of group differences.
 
 \strong{Three or More Groups}
 
-At this time, only two groups are supported. There is a method proposed to
-test three or more groups in Jamison, Golino, and Christensen (2023) but
-this approach has not been thoroughly vetted and validated. Future versions
-of the package will provide support for three or more groups once there is
-an established consensus for best practice.
+When there are 3 or more groups, the function performs metric invariance testing by comparing
+all possible pairs of groups. Specifically:
+
+\itemize{
+
+\item \emph{Pairwise Comparisons}: The function generates all possible unique group pairings
+and computes the differences in network loadings for each pair. The same community structure,
+derived from configural invariance or provided by the user, is used for all groups.
+
+\item \emph{Permutation Testing}: For each group pair, permutation tests are conducted to
+assess the statistical significance of the observed differences in loadings. \emph{p}-values are
+calculated based on the proportion of permuted differences that are greater than or equal to
+the observed difference.
+
+\item \emph{Result Compilation}: The function compiles the results for each pair including
+both uncorrected (\code{p}) and FDR-corrected (Benjamini-Hochberg; \code{p_BH}) \emph{p}-values,
+and the direction of differences. It returns a summary of the findings for all pairwise comparisons.
+
+}
+
+This approach allows for a detailed examination of metric invariance across multiple groups,
+ensuring that all potential differences are thoroughly assessed while maintaining the ability
+to identify specific group differences.
 
 For more details, see Jamison, Golino, and Christensen (2023)
 }
@@ -305,12 +323,12 @@ plot(results, p_type = "p_BH", p_value = 0.10)}
 }
 \references{
 \strong{Original implementation} \cr
-Jamison, L., Golino, H., & Christensen, A. P. (2023).
+Jamison, L., Christensen, A. P., & Golino, H. F. (2024).
 Metric invariance in exploratory graph analysis via permutation testing.
-\emph{PsyArXiv}.
+\emph{Methodology}, \emph{20}(2), 144-186.
 }
 \seealso{
-\code{\link[EGAnet]{plot.EGAnet}} for plot usage in \code{\link{EGAnet}}
+\code{\link[EGAnet]{plot.EGAnet}} for plot usage in \code{}
 }
 \author{
 Laura Jamison <lj5yn@virginia.edu>,

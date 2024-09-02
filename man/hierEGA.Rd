@@ -6,7 +6,7 @@
 \usage{
 hierEGA(
   data,
-  loading.method = c("BRM", "experimental"),
+  loading.method = c("original", "revised"),
   rotation = NULL,
   scores = c("factor", "network"),
   loading.structure = c("simple", "full"),
@@ -29,9 +29,9 @@ Should consist only of variables to be used in the analysis
 
 \item{loading.method}{Character (length = 1).
 Sets network loading calculation based on implementation
-described in \code{"BRM"} (Christensen & Golino, 2021) or
-an \code{"experimental"} implementation.
-Defaults to \code{"BRM"}}
+described in \code{"original"} (Christensen & Golino, 2021) or
+the \code{"revised"} (Christensen et al., 2024) implementation.
+Defaults to \code{"revised"}}
 
 \item{rotation}{Character.
 A rotation to use to obtain a simpler structure.
@@ -147,7 +147,7 @@ See \code{\link[EGAnet]{TMFG}} for more details
 }}
 
 \item{lower.algorithm}{Character or
-\code{\link{igraph}} \code{cluster_*} function (length = 1).
+\code{} \code{cluster_*} function (length = 1).
 Defaults to the lower order \code{"louvain"} with most common
 consensus clustering (1000 iterations; see
 \code{\link[EGAnet]{community.consensus}} for more details)
@@ -158,8 +158,8 @@ recommended. Using any other algorithm is considered
 capture lower order communities}
 
 \item{higher.algorithm}{Character or
-\code{\link{igraph}} \code{cluster_*} function (length = 1).
-Defaults to \code{"walktrap"}.
+\code{} \code{cluster_*} function (length = 1).
+Defaults to \code{"louvain"}.
 Three options are listed below but all are available
 (see \code{\link[EGAnet]{community.detection}} for other options):
 
@@ -167,11 +167,11 @@ Three options are listed below but all are available
 
 \item \code{"leiden"} --- See \code{\link[igraph]{cluster_leiden}} for more details
 
-\item \code{"louvain"} --- By default, \code{"louvain"} will implement the Louvain algorithm using
-the consensus clustering method (see \code{\link[EGAnet]{community.consensus}}
-for more information). This function will implement
-\code{consensus.method = "most_common"} and \code{consensus.iter = 1000}
-unless specified otherwise
+\item \code{"louvain"} --- By default, \code{"louvain"} will implement the higher-order
+(\code{order = "higher"}) Louvain algorithm using the consensus clustering method
+(see \code{\link[EGAnet]{community.consensus}} for more information).
+This function will implement \code{consensus.method = "most_common"} and
+\code{consensus.iter = 1000} unless specified otherwise
 
 \item \code{"walktrap"} --- See \code{\link[igraph]{cluster_walktrap}} for more details
 
@@ -278,15 +278,24 @@ Jiménez, M., Abad, F. J., Garcia-Garzon, E., Golino, H., Christensen, A. P., & 
 Dimensionality assessment in bifactor structures with multiple general factors: A network psychometrics approach.
 \emph{Psychological Methods}.
 
+\strong{3+ level hierarchical EGA} \cr
+Samo, A., Christensen, A. P., Abad, F. J., Garrido, L. E., Garcia-Garzon, E., Golino, H. & McAbee, S. T. (2023). Building the structure of personality from the bottom-up using Hierarchical Exploratory Graph Analysis.
+\emph{PsyArXiv}.
+
 \strong{Conceptual implementation} \cr
 Golino, H., Thiyagarajan, J. A., Sadana, R., Teles, M., Christensen, A. P., & Boker, S. M. (2020).
 Investigating the broad domains of intrinsic capacity, functional ability and
 environment: An exploratory graph analysis approach for improving analytical
 methodologies for measuring healthy aging.
 \emph{PsyArXiv}.
+
+\strong{Revised network loadings} \cr
+Christensen, A. P., Golino, H., Abad, F. J., & Garrido, L. E. (2024).
+Revised network loadings.
+\emph{PsyArXiv}.
 }
 \seealso{
-\code{\link[EGAnet]{plot.EGAnet}} for plot usage in \code{\link{EGAnet}}
+\code{\link[EGAnet]{plot.EGAnet}} for plot usage in \code{}
 }
 \author{
 Marcos Jiménez <marcosjnezhquez@gmailcom>,
