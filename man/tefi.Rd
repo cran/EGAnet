@@ -17,7 +17,7 @@ Can be theoretical factors or the structure detected by \code{\link{EGA}}}
 
 \item{verbose}{Boolean (length = 1).
 Whether messages and (insignificant) warnings should be output.
-Defaults to \code{TRUE} to see all messages and warnings for every 
+Defaults to \code{TRUE} to see all messages and warnings for every
 function call.
 Set to \code{FALSE} to ignore messages and warnings}
 }
@@ -36,12 +36,10 @@ Returns a data frame with columns:
 
 \item{VN.Entropy.Fit}{The Generalized Total Entropy Fit Index using Von Neumman's entropy}
 
-\item{Lower.Order.VN}{Lower order (only) Total Entropy Fit Index}
-
-\item{Higher.Order.VN}{Higher order (only) Total Entropy Fit Index}
+\item{Level_#_VN}{An individual level's Von Neumann's entropy}
 }
 \description{
-Computes the fit (TEFI) of a dimensionality structure using Von Neumman's entropy 
+Computes the fit (TEFI) of a dimensionality structure using Von Neumman's entropy
 when the input is a correlation matrix. Lower values suggest better fit of a structure to the data.
 }
 \examples{

@@ -22,12 +22,26 @@
 #' \code{10} makes loadings roughly the size of factor loadings when correlations
 #' between factors are orthogonal
 #'
-#' @param rotation Character.
+#' @param rotation Character (length = 1).
 #' A rotation to use to obtain a simpler structure.
 #' For a list of rotations, see \code{\link[GPArotation]{rotations}} for options.
 #' Defaults to \code{NULL} or no rotation.
 #' By setting a rotation, \code{scores} estimation will be
 #' based on the rotated loadings rather than unrotated loadings
+#'
+#' @param ordered Character (length = 1).
+#' How the loadings should be ordered in the output.
+#' Available options:
+#'
+#' \itemize{
+#'
+#' \item \code{"descending"} (default) --- Sorts loadings in descending
+#' order on their assigned community. This option is best for interpretation
+#'
+#' \item \code{"variable"} --- Keeps variables in the same order as the
+#' original network. This option is best for analyses
+#'
+#' }
 #'
 #' @param ... Additional arguments to pass on to \code{\link[GPArotation]{rotations}}
 #'
@@ -77,19 +91,20 @@
 #' \emph{Multivariate Behavioral Research}, 1-25.
 #'
 #' \strong{Revised network loadings} \cr
-#' Christensen, A. P., Golino, H., Abad, F. J., & Garrido, L. E. (2024).
+#' Christensen, A. P., Golino, H., Abad, F. J., & Garrido, L. E. (2025).
 #' Revised network loadings.
-#' \emph{PsyArXiv}.
+#' \emph{Behavior Research Methods}, 57, 114.
 #'
 #' @author Alexander P. Christensen <alexpaulchristensen@gmail.com> and Hudson Golino <hfg9s at virginia.edu>
 #'
 #' @export
 #'
 # Network Loadings ----
-# Updated 06.03.2025
+# Updated 02.12.2025
 net.loads <- function(
     A, wc, loading.method = c("original", "revised"),
-    scaling = 2, rotation = NULL, ...
+    scaling = 2, rotation = NULL,
+    ordered = c("descending", "variable"), ...
 )
 {
 
@@ -110,6 +125,9 @@ net.loads <- function(
     loading.method <- set_default(loading.method, "revised", net.loads)
 
   }
+
+  # Check for missing arguments (argument, default, function)
+  ordered <- set_default(ordered, "descending", net.loads)
 
   # Organize and extract input (handles argument errors)
   # `wc` is made to be a character vector to allow `NA`
@@ -181,7 +199,9 @@ net.loads <- function(
   standardized <- standardize(unstandardized, loading.method, A, wc, scaling)
 
   # Get descending order
-  standardized <- descending_order(standardized, wc, unique_communities, node_names)
+  if(ordered == "descending"){
+    standardized <- descending_order(standardized, wc, unique_communities, node_names)
+  }
 
   # Check for rotation
   if(!is.null(rotation)){
@@ -222,7 +242,7 @@ net.loads <- function(
     rotation_OUTPUT <- do.call(rotation_FUN, rotation_ARGS)
 
     # Align rotated loadings
-    aligned_output <- fungible::faAlign(
+    aligned_output <- faAlign_fungible(
       F1 = standardized,
       F2 = rotation_OUTPUT$loadings,
       Phi2 = rotation_OUTPUT$Phi
@@ -248,7 +268,7 @@ net.loads <- function(
 
   # Set up results
   results <- list(
-    unstd = unstandardized[dimnames(standardized)[[1]],],
+    unstd = unstandardized[dimnames(standardized)[[1]],, drop = FALSE],
     std = standardized,
     rotated = rotated
   )
@@ -284,7 +304,6 @@ net.loads <- function(
 
   # Return results
   return(results)
-
 
 }
 
@@ -462,7 +481,7 @@ obtain_signs <- function(target_network)
     # Flip variable
     target_network[minimum_index,] <-
       target_network[,minimum_index] <-
-        -target_network[minimum_index,]
+      -target_network[minimum_index,]
 
     # Set sign as flipped
     signs[minimum_index] <- -signs[minimum_index]
@@ -761,6 +780,69 @@ rotation_defaults <- function(rotation, rotation_ARGS, ellipse)
 
   # Return arguments
   return(rotation_ARGS)
+
+}
+
+#' @noRd
+# Align loadings ----
+# Uses least squares method from {fungible}'s `faAlign` function
+# {fungible} version 2.3
+# Updated 02.12.2025
+faAlign_fungible <- function(F1, F2, Phi2)
+{
+
+  # Start with unique match to TRUE
+  UniqueMatch <- TRUE
+
+  # Get number of dimensions
+  Nfac <- dim(F1)[2]
+
+  # Compute modified least squares (i.e., squared distance) matrix
+  A <-  matrix(colSums(F1^2), Nfac, Nfac, byrow=FALSE)
+  B <- t(matrix(colSums(F2^2),Nfac, Nfac, byrow=FALSE))
+
+  # When factors are optimally reflected the cross product will be positive
+  LSmat <- A + B  - 2 * abs(crossprod(F1, F2))
+
+  # Test for unique matches
+  Qmatch <- apply(LSmat, 1, which.min)
+  if(length(unique(Qmatch)) != Nfac){
+    UniqueMatch <- FALSE
+  }
+
+  # If unique match not found minimize sum of squares
+  if(UniqueMatch == FALSE){
+    Qmatch <- clue::solve_LSAP(LSmat, maximum = FALSE)
+  }
+
+  # Map factors
+  FactorMap <- rbind(seq_len(Nfac), Qmatch)
+
+  # This allows a column of F1 to have all zeros
+  F1noZeros[,colSums(F1) == 0] <- 1
+
+  # Obtain factor loading matrix
+  Dsgn <- diag(sign(colSums(F1noZeros * F2[,Qmatch])))
+  F2 <- F2[, Qmatch] %*% Dsgn
+
+  # Set names
+  rownames(FactorMap) <- c("Original Order", "Sorted Order")
+
+  # Obtain factor correlation matrix
+  if(!is.null(Phi2)){
+    Phi2 <- Dsgn %*% Phi2[Qmatch, Qmatch] %*% Dsgn
+  }
+
+  # Return results
+  return(
+    list(
+      F2 = F2,
+      Phi2 = Phi2,
+      FactorMap = FactorMap,
+      UniqueMatch = UniqueMatch,
+      Dsgn = Dsgn
+    )
+  )
 
 }
 

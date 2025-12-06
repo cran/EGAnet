@@ -106,22 +106,10 @@
 #' Why overfitting is not (usually) a problem in partial correlation networks.
 #' \emph{Psychological Methods}, \emph{27}(5), 822–840.
 #'
-#' \strong{Cohen's Kappa} \cr
-#' Cohen, J. (1960). A coefficient of agreement for nominal scales.
-#' \emph{Educational and Psychological Measurement}, \emph{20}(1), 37-46.
-#'
-#' Cohen, J. (1968). Weighted kappa: nominal scale agreement provision for scaled disagreement or partial credit.
-#' \emph{Psychological Bulletin}, \emph{70}(4), 213-220.
-#'
-#' \strong{Krippendorff's alpha} \cr
-#' Krippendorff, K. (2013).
-#' Content analysis: An introduction to its methodology (3rd ed.).
-#' Thousand Oaks, CA: Sage.
-#'
 #' @export
 #'
 # Predict new data based on network ----
-# Updated 10.07.2024
+# Updated 19.11.2025
 network.predictability <- function(network, original.data, newdata, ordinal.categories = 7)
 {
 
@@ -192,7 +180,8 @@ network.predictability <- function(network, original.data, newdata, ordinal.cate
   # negative inverse variances
 
   # Get betas
-  betas <- network * sqrt(outer(inverse_variances, inverse_variances, FUN = "/"))
+  inv_K <- outer(inverse_variances, inverse_variances, FUN = "/")
+  betas <- network * ((inv_K + t(inv_K)) / 2)
 
   # Obtain means and standard deviations
   original_means <- colMeans(original.data, na.rm = TRUE)

@@ -1,6 +1,47 @@
 WEBSITE: https://r-ega.net
 
-## Changes in version 2.2.1
+
+## Changes in version 2.4.0
+
++	ADD: new function (`plot_clusters`) to plot clusters of individual `dynEGA` results
+
++	ADD: TEFI optimization for `dynEGA` functions
+
++	ADD: `dynamic.network.compare` to compare dynamic networks (allows for paired and non-paired tests)
+
++	ADD: `network.fit` for traditional fit statistics (only accurate for continuous data)
+
++	ADD: `known.graph` to refit without regularization or allow a graph to be estimated with weights when it is known
+
++	CHANGE: `network.nonconvex` changed to `network.regularization` for more generic implementations
+
++	UPDATE: zero variance time series handling in `dynEGA` functions
+
++	UPDATE: better mechanism for `simEGM`
+
++	UPDATE: better optimizations for `EGM.optimizations`
+
++	REMOVE: `EGM` has been removed (for now) as its under revision
+
++	REMOVE: `network.nonconvex` has been removed (for now) as its under revision
+
++	INTERNAL: regularization penalties and derivatives are added but not used (yet)
+
+
+## Changes in version 2.3.1
+
++	FIX: documentation for `itemDiagnostics`
+
++	FIX: `$keep` output from `itemDiagnostics` rather than `$suggested`
+
++	UPDATE: added argument, `ordered`, to either output `net.loads` in the initial variable order or descending order for each community
+
++	UPDATE: beta-min condition is used to supply a model-implied network for `simEGM`
+
++	UPDATE: missing data handling in `glla` and subsequently `dynEGA` functions
+
+
+## Changes in version 2.3.0
 
 +	ADD: `itemDiagnostics` for automated detection of potential instability issues such as local dependnece, minor dimensions, multidimensionality, and low loadings
 

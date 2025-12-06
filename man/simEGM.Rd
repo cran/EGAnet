@@ -2,16 +2,17 @@
 % Please edit documentation in R/simEGM.R
 \name{simEGM}
 \alias{simEGM}
-\title{Simulate data following a Exploratory Graph Model (\code{\link[EGAnet]{EGM}})}
+\title{Simulate data following a Exploratory Graph Model (\code{EGM})}
 \usage{
 simEGM(
   communities,
   variables,
   loadings,
-  cross.loadings = 0.02,
+  cross.loadings = 0.01,
   correlations,
   sample.size,
-  max.iterations = 1000
+  quality = c("acceptable", "robust"),
+  max.iterations = 100
 )
 }
 \arguments{
@@ -21,36 +22,67 @@ Number of communities to generate}
 \item{variables}{Numeric vector (length = 1 or \code{communities}).
 Number of variables per community}
 
-\item{loadings}{Numeric (length = 1).
+\item{loadings}{Numeric (length = 1, \code{communities}, or
+total variables \eqn{\times} \code{communities}).
 Magnitude of the assigned network loadings.
-For reference, small (0.20), moderate (0.35), and large (0.50)
+For reference, small (0.20), moderate (0.35), and large (0.50).
+Input can be a loading matrix but must have the dimensions:
+total variables \eqn{\times} \code{communities}
 
-Uses \code{runif(n, min = value - 0.075, max = value + 0.075)} for some jitter in the loadings}
+Uses \code{runif(n, min = value - 0.025, max = value + 0.025)} for some jitter in the loadings}
 
 \item{cross.loadings}{Numeric (length = 1).
 Standard deviation of a normal distribution with a mean of zero (\code{n, mean = 0, sd = value}).
-Defaults to \code{0.02}.
+Defaults to \code{0.01}.
 Not recommended to change too drastically (small increments such as \code{0.01} work best)}
 
-\item{correlations}{Numeric (length = 1).
-Magnitude of the community correlations}
+\item{correlations}{Numeric (length = 1 or
+\code{communities} \eqn{\times} \code{communities} matrix).
+Magnitude of the community correlations.
+Input can be a correlations matrix but must have the dimensions:
+\code{communities} \eqn{\times} \code{communities}}
 
 \item{sample.size}{Numeric (length = 1).
 Number of observations to generate}
 
+\item{quality}{Character (length = 1).
+Quality metrics related to the alignment of the correlations
+implied by the loadings and network are computed with certain
+standards in place to accept a solution.
+These metrics include:
+
+\itemize{
+
+\item SRMR (or RMSE) --- standardized root mean residual where
+acceptable equals 0.02 and robust equals 0.01
+
+\item MAE --- mean absolute error where
+acceptable equals 0.02 and robust equals 0.01
+
+\item \code{\link[EGAnet]{frobenius}} --- Frobenius norm where
+acceptable equals 0.90 and robust equals 0.95
+
+\item \code{\link[EGAnet]{jsd}} --- Jensen-Shannon Distance where
+acceptable equals 0.10 and robust equals 0.05
+
+}
+
+Defaults to \code{"acceptable"}.
+\code{"robust"} is available but most often needs \code{density.power}
+to be increased to allow for more cross-loadings to converge}
+
 \item{max.iterations}{Numeric (length = 1).
 Number of iterations to attempt to get convergence before erroring out.
-Defaults to \code{1000}}
+Defaults to \code{100}}
 }
 \description{
-Function to simulate data based on \code{\link[EGAnet]{EGM}}
+Function to simulate data based on \code{EGM}
 }
 \examples{
 simulated <- simEGM(
   communities = 2, variables = 6,
-  loadings = 0.55, # use standard factor loading sizes
-  correlations = 0.30,
-  sample.size = 1000
+  loadings = 0.35, # use network loading sizes
+  correlations = 0.30, sample.size = 1000
 )
 
 }

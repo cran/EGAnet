@@ -1,7 +1,11 @@
 #' @title Diagnostics Analysis for Low Stability Items
 #'
-#' @description Computes the between- and within-community
-#' \code{strength} of each variable for each community
+#' @description Computes item diagnostics to determine whether there exist several
+#' potential psychometric issues that affect \code{\link[EGAnet]{itemStability}}.
+#' These issues include local dependence (using \code{\link[EGAnet]{UVA}}),
+#' minor dimensions (using \code{\link[EGAnet]{cosine}} on the stability patterns),
+#' multidimensional items (using \code{\link[EGAnet]{net.loads}}), and
+#' items with low loadings (using \code{\link[EGAnet]{net.loads}})
 #'
 #' @param data Matrix or data frame.
 #' Should consist only of variables to be used in the analysis
@@ -40,7 +44,7 @@
 #' @export
 #'
 # Item diagnostics ----
-# Updated 09.04.2025
+# Updated 24.04.2025
 itemDiagnostics <- function(data, ...)
 {
 
@@ -90,13 +94,13 @@ itemDiagnostics <- function(data, ...)
     ellipse <- list(...)
 
     # Set up message
-    message <- "All items have good stability (>= 0.75)\n"
+    message <- "All items have good stability (>= 0.75) "
 
     # Add except message
     if(n_low_stabilities == 1){
       message <- paste0(
-        message, " except for ",
-        low_names, ".\nRemoval is suggested\n")
+        message, "except for '",
+        low_names, "'.\nRemoval is suggested\n")
     }
 
     # Check for verbose
@@ -110,7 +114,7 @@ itemDiagnostics <- function(data, ...)
     return(
       list(
         boot = boot, uva = UVA(data, reduce = FALSE, ...),
-        loadings = silent_call(net.loads(boot$EGA, ...)),
+        loadings = silent_call(net.loads(boot$EGA, ordered = "variable", ...)),
         suggested = swiftelse(
           n_low_stabilities == 1,
           node_names[node_names != low_names],
@@ -133,11 +137,11 @@ itemDiagnostics <- function(data, ...)
   minor <- minor_dimensions(
     ega = boot$EGA, wto_output = uva$wto$matrix,
     stabilities = boot$stability$item.stability$item.stability$all.dimensions[low_names,, drop = FALSE],
-    cut_off = 0.95
+    cut_off = 0.95, ...
   )
 
   # Obtain loadings
-  loadings <- silent_call(net.loads(boot$EGA, ...))
+  loadings <- silent_call(net.loads(boot$EGA, ordered = "variable", ...))
 
   # Obtain unstable loadings and make them absolute for the following checks
   loadings_unstable <- abs(loadings$std[low_names,, drop = FALSE])
@@ -273,8 +277,8 @@ summary.itemDiagnostics <- function(object, ...)
 
 #' @noRd
 # Cosine for minor dimensions stabilities ----
-# Updated 07.04.2025
-minor_dimensions <- function(ega, wto_output, stabilities, cut_off = 0.95)
+# Updated 18.04.2025
+minor_dimensions <- function(ega, wto_output, stabilities, cut_off = 0.95, ...)
 {
 
   # Transpose stabilities
@@ -326,12 +330,12 @@ minor_dimensions <- function(ega, wto_output, stabilities, cut_off = 0.95)
 
   }
 
-  # Only select rows that have 3 or less nodes
-  less_than <- rowSums(minor_matrix != 0) < 4
-  minor_matrix <- minor_matrix[
-    less_than, seq_len(swiftelse(minor_columns < 3, minor_columns, 3)), drop = FALSE
-  ]
-  n_lengths <- sum(less_than)
+  # # Only select rows that have 3 or less nodes
+  # less_than <- rowSums(minor_matrix != 0) < 4
+  # minor_matrix <- minor_matrix[
+  #   less_than, seq_len(swiftelse(minor_columns < 3, minor_columns, 3)), drop = FALSE
+  # ]
+  # n_lengths <- sum(less_than)
 
   # Check for more than one
   if(n_lengths > 1){
@@ -379,8 +383,8 @@ minor_dimensions <- function(ega, wto_output, stabilities, cut_off = 0.95)
 
   }
 
-  # Compute loadings
-  loadings <- silent_call(net.loads(ega)$std)
+  # Compute loadings (make absolute for check below)
+  loadings <- abs(silent_call(net.loads(ega, ordered = "variable", ...)$std))
 
   # Numeric communities
   numeric_communities <- as.numeric(dimnames(loadings)[[2]])
@@ -428,7 +432,7 @@ loadings_remove <- function(boot, stabilities, cut_off = 0.35, ...)
 
   # Compute loadings
   loadings <- silent_call(
-    net.loads(boot$EGA, ...)$std[dimnames(boot$EGA$network)[[2]],, drop = FALSE]
+    net.loads(boot$EGA, ordered = "variable", ...)$std
   )
 
   # Get residuals from implied - empirical correlations
@@ -449,7 +453,7 @@ loadings_remove <- function(boot, stabilities, cut_off = 0.35, ...)
   )
 
   # Get loadings
-  loadings <- silent_call(net.loads(ega, ...)$std[node_names,, drop = FALSE])
+  loadings <- silent_call(net.loads(ega, ordered = "variable", ...)$std)
 
   # Get maximum loadings
   max_loadings <- nvapply(as.data.frame(abs(t(loadings))), function(x){max(x)})
@@ -461,7 +465,7 @@ loadings_remove <- function(boot, stabilities, cut_off = 0.35, ...)
 
 #' @noRd
 # Automated node selection ----
-# Updated 08.04.2025
+# Updated 25.04.2025
 automated_selection <- function(result)
 {
 
@@ -545,16 +549,32 @@ automated_selection <- function(result)
       # Continue with remaining variables
       if(length(check_tracker) != 0){
 
-        # Keep the highest stability
-        keep[[i]] <- check_tracker[
-          which.max(
-            apply(
-              result$boot$stability$item.stability$item.stability$all.dimensions[
-                check_tracker, community_sequence
-              ], 1, max
+        # Obtain maximum stability
+        stabilities <- apply(
+          result$boot$stability$item.stability$item.stability$all.dimensions[
+            check_tracker, community_sequence, drop = FALSE
+          ], 1, max
+        )
+
+        # Get indices for maximum stabilities
+        max_index <- stabilities == max(stabilities)
+
+        # Check for single highest value
+        if(sum(max_index) == 1){
+          keep[[i]] <- check_tracker[which.max(stabilities)]
+        }else{ # Determine based on wTO values
+
+          # Get current index
+          current_index <- index[names(stabilities)[max_index]]
+
+          # Selection index based on lowest maximum wTO value to all other variables
+          keep[[i]] <- names(
+            which.min(
+              apply(result$uva$wto$matrix[current_index, -current_index], 1, max, na.rm = TRUE)
             )
           )
-        ]
+
+        }
 
         # Remove from tracker
         tracker <- tracker[!tracker %in% check_tracker]
@@ -568,7 +588,7 @@ automated_selection <- function(result)
 
   }
 
-  # 3. Check for multidimensional
+  # 4. Check for multidimensional
   if("MuD" %in% unique_tags){
 
     # Get multidimensional
@@ -579,7 +599,7 @@ automated_selection <- function(result)
 
   }
 
-  # 4. Check for low loadings
+  # 5. Check for low loadings
   if("Low" %in% unique_tags){
 
     # Get low loadings
