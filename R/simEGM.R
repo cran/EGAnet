@@ -45,7 +45,7 @@
 #' \item MAE --- mean absolute error where
 #' acceptable equals 0.02 and robust equals 0.01
 #'
-#' \item \code{\link[EGAnet]{frobenius}} --- Frobenius norm where
+#' \item \code{\link[EGAnet]{sF}} --- sF where
 #' acceptable equals 0.90 and robust equals 0.95
 #'
 #' \item \code{\link[EGAnet]{jsd}} --- Jensen-Shannon Distance where
@@ -73,7 +73,7 @@
 #' @export
 #'
 # Simulate EGM ----
-# Updated 17.11.2025
+# Updated 25.02.2026
 simEGM <- function(
     communities, variables,
     loadings, cross.loadings = 0.01,
@@ -303,10 +303,52 @@ simEGM <- function(
 
       # Set correlations for loadings
       R <- nload2cor(loading_structure)
-      P <- cor2pcor(R)
+      network <- P <- cor2pcor(R)
+      abs_network <- abs(network)
+
+      # Set sparsest possible network
+      sparse_P <- sparse_network(abs(P))
+      thresholds <- sparse_P$weight[order(sparse_P$weight, decreasing = FALSE)]
+
+      # Set network based on thresholds
+      quality_metrics <- do.call(
+        rbind, lapply(seq_along(thresholds), function(i){
+
+          # Threshold network
+          network[abs_network < thresholds[i]] <- 0
+
+          # Convert to correlations
+          network_R <- pcor2cor(network)
+
+          # Return quality metrics
+          return(
+            c(
+              srmr(R, network_R), mean(abs(R - network_R)),
+              sF(R, network_R), jsd(R, network_R)
+            )
+          )
+
+        })
+      )
+
+      # Search for all TRUE
+      passing <- which(
+        quality_metrics[,1] < quality_comp[[quality]][1] &
+        quality_metrics[,2] < quality_comp[[quality]][2] &
+        quality_metrics[,3] > quality_comp[[quality]][3] &
+        quality_metrics[,4] < quality_comp[[quality]][4]
+      )
+
+      # Check for any passing
+      if(length(passing) == 0){
+        next
+      }
+
+      # Set network
+      network[abs_network < thresholds[max(passing)]] <- 0
 
       # Obtain network matrix based on Chung-Lu expectation of simple structure
-      network <- expected_network(loading_structure, membership, total_variables)
+      # network <- expected_network(loading_structure, membership, sample.size, total_variables)
       network_R <- silent_call(try(pcor2cor(network), silent = TRUE))
 
       # Check for issues
@@ -342,13 +384,13 @@ simEGM <- function(
 
       # Set quality metrics
       quality_metrics <- c(
-        srmr(P, network), mean(abs(P - network)),
-        frobenius(P, network), jsd(P, network)
+        srmr(R, network_R), mean(abs(R - network_R)),
+        sF(R, network_R), jsd(R, network_R)
       )
 
       # Quality metric check
       quality_df <- data.frame(
-        Metric = c("SRMR", "MAE", "Frobenius", "JSD"),
+        Metric = c("SRMR", "MAE", "sF", "JSD"),
         Value = quality_metrics,
         Acceptable = quality_comp$acceptable,
         Robust = quality_comp$robust,
@@ -401,6 +443,15 @@ simEGM <- function(
   )
 
 }
+
+# Bug checking ----
+# communities = 3; variables = 6
+# loadings = 0.35; cross.loadings = 0.01
+# correlations = 0.30; sample.size = 1000
+# quality = "acceptable"; max.iterations = 100
+# source("/home/alextops/R/R-packages/EGAnet/R/utils-EGAnet.R")
+# source("/home/alextops/R/R-packages/EGAnet/R/helpers.R")
+# source("/home/alextops/R/R-packages/EGAnet/R/EGM.optimizations.R")
 
 #' @noRd
 # Errors ----
@@ -465,25 +516,35 @@ simEGM_errors <- function(
 
 #' @noRd
 # Expected network ----
-# Updated 31.07.2025
+# Updated 25.02.2026
 expected_network <- function(loading_structure, membership, total_variables)
 {
 
   # Obtain partial correlations
   P <- nload2pcor(loading_structure)
 
-  # Set Chung-Lu configuration based on maximum loading
-  max_loading <- nvapply(seq_len(total_variables), function(i){
-    max(abs(loading_structure[i, membership[i]]))
-  })
+  # Set Chung-Lu configuration based on interdependence
+  assigned_loading <- sqrt(rowSums(loading_structure^2))
 
   # Return partial correlations
-  return(P * (abs(P) > (tcrossprod(max_loading) / sum(max_loading))))
+  return(P * (abs(P) > (tcrossprod(assigned_loading) / sum(assigned_loading))))
 
 }
 
+expected_network <- function(loading_structure, membership, sample.size, total_variables)
+{
+  # Obtain partial correlations
+  P <- nload2pcor(loading_structure)
+
+  # Expected edges
+  EE <- expected_edges(P, c(sample.size, total_variables))
+
+  # Return sparse partial correlations
+  return(P * (abs(P) > EE - 1.96 * attr(EE, "SE")))
+}
+
 #' @noRd
-# Community correlations from loadings
+# Community correlations from loadings ----
 # Updated 21.07.2025
 community_correlations <- function(simple_structure, loading_structure)
 {

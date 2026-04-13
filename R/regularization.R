@@ -21,6 +21,35 @@ bridge_penalty <- function(x, lambda, gamma = 1, ...)
 }
 
 #' @noRd
+# Updated 10.01.2026
+exp_penalty <- function(x, lambda, gamma = 0.01, ...)
+{
+
+  # Pre-compute components
+  x <- abs(x)
+
+  # Return penalty
+  return(lambda * (1 - exp(-(x / gamma))))
+
+}
+
+#' @noRd
+# Updated 09.02.2026
+gumbel_penalty <- function(x, lambda, gamma = 0.01, ...)
+{
+
+  # Pre-compute
+  exp_1 <- exp(-1)
+
+  return((lambda / (1 - exp_1)) * (exp(-exp(-abs(x) / gamma)) - exp_1))
+  # theoretically, the `- exp(-1)` is necessary for the
+  # penalty to converge at zero for the sparsity condition
+  # in practice, this addition does not change the derivative,
+  # which is used in the LLA
+  # `1 - exp(-1)` is to scale lambda
+}
+
+#' @noRd
 # Updated 25.07.2025
 l1_penalty <- function(x, lambda, ...)
 {
@@ -32,16 +61,6 @@ l1_penalty <- function(x, lambda, ...)
 l2_penalty <- function(x, lambda, ...)
 {
   return(lambda * x^2)
-}
-
-#' @noRd
-# Updated 12.01.2025
-lomax_penalty <- function(x, lambda, gamma = 4, ...)
-{
-
-  # Return lambdas
-  return(lambda * (1 - (1 / (abs(x) + 1))^gamma))
-
 }
 
 #' @noRd
@@ -84,15 +103,15 @@ scad_penalty <- function(x, lambda, gamma = 3.7, ...)
 }
 
 #' @noRd
-# Updated 22.11.2025
-weibull_penalty <- function(x, lambda, gamma, scale, ...)
+# Updated 05.02.2026
+weibull_penalty <- function(x, lambda, gamma = 0.01, shape, ...)
 {
 
   # Pre-compute components
   x <- abs(x)
 
   # Return penalty
-  return(lambda * (1 - exp(-(x / scale)^gamma)))
+  return(lambda * (1 - exp(-(x / gamma)^shape)))
 
 }
 
@@ -101,14 +120,14 @@ weibull_penalty <- function(x, lambda, gamma, scale, ...)
 #%%%%%%%%%%%%%%%%%%
 
 #' @noRd
-# Updated 25.07.2025
+# Updated 27.02.2026
 atan_derivative <- function(x, lambda, gamma = 0.01, ...)
 {
-  return(lambda * sign(x) * (gamma * (gamma + 2 / pi)) / (gamma^2 + abs(x)^2))
+  return(lambda * (gamma * (gamma + 2 / pi)) / (gamma^2 + x^2))
 }
 
 #' @noRd
-# Updated 22.11.2025
+# Updated 04.03.2026
 bridge_derivative <- function(x, lambda, gamma = 1, eps = 1e-08, ...)
 {
 
@@ -121,36 +140,49 @@ bridge_derivative <- function(x, lambda, gamma = 1, eps = 1e-08, ...)
   abs_x <- pmax(abs(x), eps)
 
   # Return derivative
-  return(lambda * gamma * x * abs_x^(gamma - 2))
+  return(lambda * gamma * abs_x * abs_x^(gamma - 2))
 
 }
 
 #' @noRd
-# Updated 25.07.2025
+# Updated 27.02.2026
+exp_derivative <- function(x, lambda, gamma = 0.01, ...)
+{
+
+  # Return penalty
+  return(lambda * (1 / gamma) * exp(-(abs(x) / gamma)))
+
+}
+
+#' @noRd
+# Updated 27.02.2026
+gumbel_derivative <- function(x, lambda, gamma = 0.01, ...)
+{
+
+  # Pre-compute values
+  gamma_x <- abs(x) / gamma
+
+  # Return derivative
+  return((lambda / (1 - exp(-1))) * (1 / gamma) * exp(-gamma_x - exp(-gamma_x)))
+
+}
+
+#' @noRd
+# Updated 27.02.2026
 l1_derivative <- function(x, lambda, ...)
 {
-  return(lambda * sign(x))
+  return(lambda)
 }
 
 #' @noRd
-# Updated 25.07.2025
+# Updated 27.02.2026
 l2_derivative <- function(x, lambda, ...)
 {
-  return(2 * lambda * x)
+  return(2 * lambda * abs(x))
 }
 
 #' @noRd
-# Updated 22.11.2025
-lomax_derivative <- function(x, lambda, gamma = 4, ...)
-{
-
-  # Return lambdas
-  return((lambda * gamma) / (abs(x) + 1)^(gamma + 1))
-
-}
-
-#' @noRd
-# Updated 25.07.2025
+# Updated 27.02.2026
 mcp_derivative <- function(x, lambda, gamma = 3, ...)
 {
 
@@ -158,48 +190,52 @@ mcp_derivative <- function(x, lambda, gamma = 3, ...)
   abs_x <- abs(x)
 
   # Return derivative
-  return((abs_x <= (gamma * lambda)) * (lambda - abs_x / gamma) * sign(x))
+  return((abs_x <= (gamma * lambda)) * (lambda - abs_x / gamma))
 
 }
 
 #' @noRd
-# Updated 08.08.2025
+# Updated 27.02.2026
 scad_derivative <- function(x, lambda, gamma = 3.7, ...)
 {
 
   # Pre-compute components
   abs_x <- abs(x)
-  sign_x <- x / abs_x
-  sign_x <- swiftelse(is.na(sign_x), 0, sign_x)
   gamma_lambda <- gamma * lambda
 
   # Return derivative
   return(
-    (abs_x <= lambda) * lambda * sign_x +  # region 1
-      ((abs_x > lambda) & (abs_x <= gamma_lambda)) * # region 2
-      (gamma_lambda - abs_x) * sign_x / (gamma - 1) +
-      (abs_x > gamma_lambda) * 0  # region 3
+    (abs_x <= lambda) * lambda +  # region 1
+    ((abs_x > lambda) & (abs_x <= gamma_lambda)) * # region 2
+    (gamma_lambda - abs_x) / (gamma - 1) +
+    (abs_x > gamma_lambda) * 0  # region 3
   )
 
 }
 
 #' @noRd
-# Updated 22.11.2025
-weibull_derivative <- function(x, lambda, gamma, scale, ...)
+# Updated 03.03.2026
+weibull_derivative <- function(x, lambda, gamma = 0.01, shape, ...)
 {
-
   # Pre-compute components
-  abs_x <- abs(x)
-  x_scale <- abs_x / scale
+  abs_x <- abs(swiftelse(x == 0, .Machine$double.eps, x))
+  x_gamma <- abs_x / gamma
 
-  # Return penalty
-  return(lambda * sign(x) * (gamma / scale) * x_scale^(gamma - 1) * exp(-x_scale^gamma))
+  # Return derivative
+  return(lambda * (shape / gamma) * x_gamma^(shape - 1) * exp(-x_gamma^shape))
 
 }
 
 #%%%%%%%%%%%%%%%%%%%%%%%%%
 ## Proximal Operators ----
 #%%%%%%%%%%%%%%%%%%%%%%%%%
+
+#' @noRd
+# Updated 13.01.2026
+atan_proximal <- function(x, lambda, gamma = 0.01, ...)
+{
+  return(l1_proximal(x, atan_derivative(x, lambda, gamma)))
+}
 
 #' @noRd
 # Updated 22.11.2025
@@ -223,6 +259,20 @@ bridge_proximal <- function(x, lambda, gamma = 1, eps = 1e-08, ...)
 }
 
 #' @noRd
+# Updated 05.02.2026
+exp_proximal <- function(x, lambda, gamma = 0.01, ...)
+{
+  return(l1_proximal(x, exp_derivative(x, lambda, gamma)))
+}
+
+#' @noRd
+# Updated 05.02.2026
+gumbel_proximal <- function(x, lambda, gamma = 0.01, ...)
+{
+  return(l1_proximal(x, gumbel_derivative(x, lambda, gamma)))
+}
+
+#' @noRd
 # Updated 25.07.2025
 l1_proximal <- function(x, lambda, ...)
 {
@@ -234,13 +284,6 @@ l1_proximal <- function(x, lambda, ...)
 l2_proximal <- function(x, lambda, ...)
 {
   return(x / (1 + 2 * lambda))
-}
-
-#' @noRd
-# Updated 22.11.2025
-lomax_proximal <- function(x, lambda, gamma = 4, ...)
-{
-  return(l1_proximal(x, lomax_derivative(x, lambda, gamma)))
 }
 
 #' @noRd
@@ -284,8 +327,8 @@ scad_proximal <- function(x, lambda, gamma = 3.7, ...)
 }
 
 #' @noRd
-# Updated 22.11.2025
-weibull_proximal <- function(x, lambda, gamma, scale, ...)
+# Updated 04.03.2026
+weibull_proximal <- function(x, lambda, gamma = 0.01, shape, ...)
 {
-  return(l1_proximal(x, weibull_derivative(x, lambda, gamma, scale)))
+  return(l1_proximal(x, weibull_derivative(x, lambda, gamma, shape)))
 }

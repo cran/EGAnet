@@ -291,7 +291,7 @@
 #' )}
 #'
 #' @references
-#' \strong{Frobenius Norm} \cr
+#' \strong{sF} \cr
 #' Ulitzsch, E., Khanna, S., Rhemtulla, M., & Domingue, B. W. (2023).
 #' A graph theory based similarity metric enables comparison of subpopulation psychometric networks.
 #' \emph{Psychological Methods}.
@@ -310,7 +310,7 @@
 #' @export
 #'
 # Perform permutations for network structures ----
-# Updated 21.11.2025
+# Updated 21.01.2026
 dynamic.network.compare <- function(
     data, paired = FALSE,
     # EGA arguments
@@ -422,7 +422,7 @@ dynamic.network.compare <- function(
     return(
       list(
         empirical_values = c(
-          "Frobenius" = frobenius(network1, network2),
+          "sF" = sF(network1, network2),
           "JSS" = 1 - jsd(network1, network2, ...),
           "Total Strength" = sum(colSums(abs(network1), na.rm = TRUE), na.rm = TRUE) -
             sum(colSums(abs(network2), na.rm = TRUE), na.rm = TRUE)
@@ -527,7 +527,7 @@ dynamic.network.compare <- function(
         return(
           list(
             empirical_values = c(
-              "Frobenius" = frobenius(network1, network2),
+              "sF" = sF(network1, network2),
               "JSS" = 1 - jsd(network1, network2, ...),
               "Total Strength" = sum(colSums(abs(network1), na.rm = TRUE), na.rm = TRUE) -
                 sum(colSums(abs(network2), na.rm = TRUE), na.rm = TRUE)
@@ -573,9 +573,10 @@ dynamic.network.compare <- function(
         data.frame(
           "statistic" = empirical[[i]]$empirical_values,
           "p.value" = c(
-            mean( # Frobenius
+            mean( # sF
               c(TRUE, permuted_values[[i]][,1] <= empirical[[i]]$empirical_values[1]),
               na.rm = TRUE
+
             ),
             mean( # JSS
               c(TRUE, permuted_values[[i]][,2] <= empirical[[i]]$empirical_values[2]),
@@ -586,8 +587,8 @@ dynamic.network.compare <- function(
               na.rm = TRUE
             )
           ),
-          "M_permutated" = colMeans(permuted_values[[i]], na.rm = TRUE),
-          "SD_permutated" = apply(permuted_values[[i]], 2, sd, na.rm = TRUE)
+          "M_permuted" = colMeans(permuted_values[[i]], na.rm = TRUE),
+          "SD_permuted" = apply(permuted_values[[i]], 2, sd, na.rm = TRUE)
         )
       )
     )

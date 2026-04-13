@@ -732,10 +732,9 @@ ncol_sequence <- function(data)
 # 1.5x faster with 1 value
 # 2.5x faster with 10 values
 # >= 18x faster with >= 100 values
-# Updated 24.07.2023
+# Updated 26.02.2026
 swiftelse <- function(condition, true, false)
 {
-
   # Get condition length
   condition_length <- length(condition)
 
@@ -752,7 +751,7 @@ swiftelse <- function(condition, true, false)
   }
 
   # Initialize result
-  result <- vector(mode(true), condition_length)
+  result <- vector(typeof(false), condition_length)
 
   # Set TRUE condition
   if(length(true) == 1){
@@ -2037,9 +2036,14 @@ rescale_edges <- function(network, edge_size)
 
 #' @noRd
 # Readable names ----
-# Updated 01.07.2023
+# Updated 13.02.2026
 readable_names <- function(node_names)
 {
+
+  # Check for nodes without names
+  if(all(node_names == "")){
+    return(node_names)
+  }
 
   # Add return to names
   return(
@@ -2149,7 +2153,7 @@ get_layout <- function(network, dimensions, non_zero_index, plot_ARGS)
 
 #' @noRd
 # Basic set up for plots ----
-# Updated 21.11.2025
+# Updated 13.02.2026
 basic_plot_setup <- function(network, wc = NULL, ...)
 {
 
@@ -2174,11 +2178,9 @@ basic_plot_setup <- function(network, wc = NULL, ...)
   # Check for empty network
   if(sum(network) == 0){
 
-    # Send message
-    message("Network is empty. No plot produced.")
-
-    # Return NULL
-    return(NULL)
+    # Cheat the network
+    network[] <- 0.0001
+    diag(network) <- 0
 
   }
 
